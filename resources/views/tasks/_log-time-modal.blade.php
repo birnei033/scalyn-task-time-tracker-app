@@ -1,0 +1,108 @@
+@php($selectedTask = $selectedTask ?? null)
+@php($showUserSelect = auth()->user()->canManageTeam())
+@php($statusValue = old('status', $selectedTask?->status ?: 'open'))
+@php($returnTo = old('return_to', request()->fullUrl() . (request()->routeIs('tasks.show') ? '#logged-time-pane' : '')))
+
+<x-item-modal-form
+    name="task-log-time-modal"
+    title="Log Time"
+    action="{{ route('tasks.log-time') }}"
+    submitLabel="Save Entry"
+    mode="modal"
+    :show="$showModal ?? false"
+    maxWidth="lg"
+>
+    <div class="row g-3">
+        <div class="col-12">
+            <div class="surface-card p-3">
+                <div class="section-kicker mb-1">Selected task</div>
+                <div class="fw-semibold" data-task-log-time-task-title>
+                    {{ $selectedTask?->title ?: 'Choose a task from the table to log time.' }}
+                </div>
+                <div class="small text-muted" data-task-log-time-task-client>
+                    {{ $selectedTask?->client?->name ?: 'The modal will populate from the row you choose.' }}
+                </div>
+                <div class="mt-2">
+                    <span
+                        class="badge {{ $selectedTask?->statusBadgeClass() ?: 'badge-soft' }}"
+                        data-task-log-time-task-status-badge
+                    >
+                        {{ $selectedTask?->statusLabel() ?: 'Not selected' }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <input
+            type="hidden"
+            name="task_id"
+            value="{{ old('task_id', $selectedTask?->id) }}"
+            data-task-log-time-task-id
+        >
+        <input type="hidden" name="return_to" value="{{ $returnTo }}">
+
+        @if ($showUserSelect)
+            <div class="col-lg-6">
+                <label class="form-label">User</label>
+                <select class="form-select @error('user_id') is-invalid @enderror" name="user_id" required data-task-log-time-user>
+                    @foreach ($users as $user)
+                        <option value="{{ $user->id }}" @selected(old('user_id', auth()->id()) == $user->id)>{{ $user->name }}</option>
+                    @endforeach
+                </select>
+                @error('user_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+            </div>
+        @else
+            <input type="hidden" name="user_id" value="{{ old('user_id', auth()->id()) }}" data-task-log-time-user>
+        @endif
+
+        <div class="col-lg-6">
+            <label class="form-label">Status</label>
+            <select class="form-select @error('status') is-invalid @enderror" name="status" required data-task-log-time-status>
+                @foreach (\App\Models\Task::statusOptions() as $value => $label)
+                    <option value="{{ $value }}" @selected($statusValue === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+            @error('status')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+        </div>
+
+        <div class="col-lg-4">
+            <label class="form-label">Date</label>
+            <input
+                type="date"
+                class="form-control @error('date') is-invalid @enderror"
+                name="date"
+                value="{{ old('date', now()->toDateString()) }}"
+                required
+                data-task-log-time-date
+            >
+            @error('date')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+        </div>
+
+        <div class="col-lg-4">
+            <label class="form-label">Hours</label>
+            <input
+                type="number"
+                min="0.25"
+                max="24"
+                step="0.25"
+                class="form-control @error('hours') is-invalid @enderror"
+                name="hours"
+                value="{{ old('hours') }}"
+                required
+                data-task-log-time-hours
+            >
+            @error('hours')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+        </div>
+
+        <div class="col-12">
+            <x-rich-text-editor
+                name="notes"
+                label="Work Description / Notes"
+                :value="old('notes')"
+                placeholder="Describe the work, updates, blockers, or context."
+                :rows="5"
+                id="task-log-time-notes"
+            />
+        </div>
+    </div>
+</x-item-modal-form>
