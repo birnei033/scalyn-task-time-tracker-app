@@ -54,6 +54,39 @@ This project also includes a Laravel setup script that installs dependencies, cr
 composer setup
 ```
 
+## Automatic Deploy to cPanel
+
+The repository now includes a deploy script and a GitHub Actions workflow so pushes to `main` can update a cPanel host over SSH.
+
+### What the deploy flow does
+
+- Pulls the latest code from `origin/main`
+- Installs production PHP dependencies
+- Clears Laravel caches
+- Runs database migrations
+- Installs frontend dependencies and builds Vite assets
+- Rebuilds Laravel config, event, and view caches
+
+### Required GitHub secrets
+
+Set these repository secrets in GitHub:
+
+- `CPANEL_HOST`
+- `CPANEL_USER`
+- `CPANEL_PATH`
+- `CPANEL_SSH_PRIVATE_KEY`
+- `CPANEL_PORT` if your SSH port is not `22`
+
+### Server requirements
+
+- SSH access must be enabled for the cPanel account
+- Git, PHP, Composer, Node.js, and npm must be available on the cPanel host
+- The repository should already be cloned into the deployment directory on the server
+
+### Workflow trigger
+
+The deploy workflow runs automatically on every push to `main`, and it can also be started manually from the GitHub Actions tab.
+
 ## Demo Accounts
 
 The seeders create three demo users:
@@ -69,4 +102,3 @@ All demo accounts use `Password123!`
 - `composer test` runs the test suite
 - `composer setup` prepares a fresh local environment
 - `composer dev` starts the app, queue listener, logs, and Vite together
-

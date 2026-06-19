@@ -1,0 +1,41 @@
+name: Deploy to cPanel
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: cpanel-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.CPANEL_SSH_PRIVATE_KEY }}
+
+      - name: Trust cPanel host
+        env:
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "$CPANEL_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy on cPanel
+        env:
+          CPANEL_HOST: ${{ secrets.CPANEL_HOST }}
+          CPANEL_USER: ${{ secrets.CPANEL_USER }}
+          CPANEL_PORT: ${{ secrets.CPANEL_PORT }}
+          CPANEL_PATH: ${{ secrets.CPANEL_PATH }}
+        run: |
+          PORT="${CPANEL_PORT:-22}"
+          ssh -p "$PORT" "$CPANEL_USER@$CPANEL_HOST" "cd \"$CPANEL_PATH\" && bash ./deploy.sh"
