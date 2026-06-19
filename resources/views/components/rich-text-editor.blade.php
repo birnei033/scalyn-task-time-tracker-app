@@ -4,6 +4,7 @@
     'value' => null,
     'placeholder' => 'Write here...',
     'rows' => 6,
+    'required' => false,
 ])
 
 @php
@@ -14,7 +15,13 @@
 
 <div class="rich-text-editor" data-rich-editor>
     @if ($label)
-        <label for="{{ $inputId }}" class="form-label">{{ $label }}</label>
+        <label for="{{ $inputId }}" class="form-label">
+            {{ $label }}
+            @if ($required)
+                <span class="text-danger ms-1" aria-hidden="true">*</span>
+                <span class="visually-hidden">required</span>
+            @endif
+        </label>
     @endif
 
     <input type="hidden" id="{{ $inputId }}" name="{{ $name }}" value="{{ old($name, $value) }}">
@@ -59,9 +66,11 @@
         class="rich-text-surface form-control {{ $hasError ? 'is-invalid' : '' }}"
         data-rich-editor-editor
         data-rich-editor-target="{{ $inputId }}"
+        data-required="{{ $required ? 'true' : 'false' }}"
         contenteditable="true"
         role="textbox"
         aria-multiline="true"
+        aria-required="{{ $required ? 'true' : 'false' }}"
         data-placeholder="{{ $placeholder }}"
         style="min-height: {{ $rows * 1.55 }}rem;"
     >{!! $oldValue !!}</div>

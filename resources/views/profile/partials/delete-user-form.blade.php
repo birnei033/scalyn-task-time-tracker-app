@@ -55,7 +55,7 @@
                     </div>
 
                     <div class="mt-4">
-                        <x-input-label for="password" value="{{ __('Password') }}" class="profile-label visually-hidden" />
+                        <x-input-label for="password" value="{{ __('Password') }}" class="profile-label visually-hidden" required />
 
                         <x-text-input
                             id="password"

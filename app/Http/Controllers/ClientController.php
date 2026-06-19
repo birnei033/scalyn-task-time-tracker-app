@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Support\TimeDisplay;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -47,9 +48,18 @@ class ClientController extends Controller
     {
         Gate::authorize('view', $client);
 
+        $now = now();
         $client->load(['tasks.assignedUser', 'tasks.timeEntries']);
+        $monthlyHours = $client->timeEntries()
+            ->whereDate('date', '>=', $now->copy()->startOfMonth())
+            ->whereDate('date', '<=', $now->copy()->endOfMonth())
+            ->sum('hours');
+        $monthlyMinutes = TimeDisplay::hoursToMinutes($monthlyHours);
+        $monthlyExcessMinutes = $client->budget_per_month !== null && $monthlyMinutes > $client->budget_per_month
+            ? $monthlyMinutes - $client->budget_per_month
+            : null;
 
-        return view('clients.show', compact('client'));
+        return view('clients.show', compact('client', 'monthlyHours', 'monthlyExcessMinutes'));
     }
 
     public function edit(Client $client)
@@ -100,8 +110,9 @@ class ClientController extends Controller
         return $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'contact_person' => ['nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255'],
+            'email' => ['required', 'email', 'max:255'],
             'company' => ['nullable', 'string', 'max:255'],
+            'budget_per_month' => ['nullable', 'integer', 'min:0'],
             'status' => ['required', 'in:active,archived'],
             'notes' => ['nullable', 'string'],
         ]);
@@ -113,7 +124,9 @@ class ClientController extends Controller
             ->when(request('search'), fn ($query, $search) => $query->where(function ($query) use ($search) {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('company', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('contact_person', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhere('notes', 'like', "%{$search}%");
             }))
             ->latest()
             ->paginate(12)

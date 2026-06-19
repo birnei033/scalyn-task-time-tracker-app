@@ -92,6 +92,44 @@ class UserManagementTest extends TestCase
         $this->assertTrue($filteredUser->exists);
     }
 
+    public function test_users_index_searches_team_names_and_roles(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $delivery = Team::factory()->create(['name' => 'Delivery']);
+        $operations = Team::factory()->create(['name' => 'Operations']);
+
+        $teamMatch = User::factory()->create([
+            'role' => 'member',
+            'team_id' => $delivery->id,
+            'name' => 'Delivery Specialist',
+        ]);
+
+        $roleMatch = User::factory()->create([
+            'role' => 'manager',
+            'team_id' => $operations->id,
+            'name' => 'Operations Lead',
+        ]);
+
+        User::factory()->create([
+            'role' => 'member',
+            'team_id' => $operations->id,
+            'name' => 'Unrelated User',
+        ]);
+
+        $this->actingAs($admin)->get(route('users.index', ['search' => 'Delivery']))
+            ->assertOk()
+            ->assertSee('Delivery Specialist')
+            ->assertDontSee('Unrelated User');
+
+        $this->actingAs($admin)->get(route('users.index', ['search' => 'manager']))
+            ->assertOk()
+            ->assertSee('Operations Lead')
+            ->assertDontSee('Unrelated User');
+
+        $this->assertTrue($teamMatch->exists);
+        $this->assertTrue($roleMatch->exists);
+    }
+
     public function test_manager_can_update_user_assignment_from_team_page(): void
     {
         $manager = User::factory()->create(['role' => 'manager']);

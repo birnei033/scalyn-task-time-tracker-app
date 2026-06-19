@@ -40,7 +40,7 @@
         >
 
         <div class="col-12">
-            <label class="form-label">Status</label>
+            <label class="form-label">Status <x-required-indicator /></label>
             <select class="form-select @error('status') is-invalid @enderror" name="status" required data-task-status-select>
                 @foreach (\App\Models\Task::statusOptions() as $value => $label)
                     <option value="{{ $value }}" @selected($statusValue === $value)>{{ $label }}</option>

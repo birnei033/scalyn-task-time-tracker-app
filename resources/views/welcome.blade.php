@@ -1,22 +1,17 @@
 <!DOCTYPE html>
 <html
     lang="{{ str_replace('_', '-', app()->getLocale()) }}"
-    data-theme-source="guest"
-    data-theme-preference="system"
 >
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ config('app.name') }}</title>
-    <x-theme-init source="guest" />
+    <x-theme-init />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
     <main class="guest-shell d-flex align-items-center py-4 py-lg-5">
         <div class="container guest-panel">
-            <div class="guest-toolbar d-flex justify-content-end mb-4">
-                <x-theme-toggle />
-            </div>
             <div class="page-hero p-4 p-lg-5 mb-4">
                 <div class="row align-items-center g-4">
                     <div class="col-lg-7">

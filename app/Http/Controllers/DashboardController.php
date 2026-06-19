@@ -15,13 +15,18 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $entryQuery = TimeEntry::query();
+        $monthStart = now()->startOfMonth()->toDateString();
+        $monthEnd = now()->endOfMonth()->toDateString();
 
         if (! $user->canManageTeam()) {
             $entryQuery->where('user_id', $user->id);
         }
 
         return view('dashboard', [
-            'totalHours' => (clone $entryQuery)->sum('hours'),
+            'totalHours' => (clone $entryQuery)
+                ->whereDate('date', '>=', $monthStart)
+                ->whereDate('date', '<=', $monthEnd)
+                ->sum('hours'),
             'weekHours' => (clone $entryQuery)
                 ->whereDate('date', '>=', now()->startOfWeek()->toDateString())
                 ->whereDate('date', '<=', now()->endOfWeek()->toDateString())

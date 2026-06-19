@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\TimeEntry;
 use App\Models\User;
+use App\Support\TimeDisplay;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -23,15 +24,21 @@ class ReportController extends Controller
 
         $report = $this->reportExportDefinition($request->query('report'));
         $data = $this->reportData($request);
-        $field = $report['field'];
-        $column = $report['column'];
         $filename = $report['filename'];
         $handle = fopen('php://temp', 'r+');
 
-        fputcsv($handle, [$column, 'Hours']);
+        fputcsv($handle, $report['columns']);
 
         foreach ($data[$report['section']] as $row) {
-            fputcsv($handle, [data_get($row, $field), number_format((float) $row->hours, 2, '.', '')]);
+            $csvRow = [$row->{$report['field']}, TimeDisplay::formatHours($row->hours)];
+
+            if ($report['section'] === 'clientHours') {
+                $csvRow[] = $row->budget_per_month === null
+                    ? 'No monthly budget set.'
+                    : TimeDisplay::formatMinutes(max(0, TimeDisplay::hoursToMinutes($row->hours) - (int) $row->budget_per_month));
+            }
+
+            fputcsv($handle, $csvRow);
         }
 
         rewind($handle);
@@ -46,6 +53,7 @@ class ReportController extends Controller
 
     private function reportData(Request $request): array
     {
+        $view = $request->query('view', 'monthly');
         $from = $request->query('from', now()->startOfMonth()->toDateString());
         $to = $request->query('to', now()->endOfMonth()->toDateString());
 
@@ -58,6 +66,7 @@ class ReportController extends Controller
             ->when($request->integer('user_id'), fn ($query, $userId) => $query->where('user_id', $userId));
 
         return [
+            'view' => $view,
             'from' => $from,
             'to' => $to,
             'clients' => Client::orderBy('name')->get(),
@@ -66,8 +75,8 @@ class ReportController extends Controller
             'clientHours' => (clone $base)
                 ->join('tasks', 'time_entries.task_id', '=', 'tasks.id')
                 ->join('clients', 'tasks.client_id', '=', 'clients.id')
-                ->select('clients.name', DB::raw('sum(time_entries.hours) as hours'))
-                ->groupBy('clients.id', 'clients.name')
+                ->select('clients.name', 'clients.budget_per_month', DB::raw('sum(time_entries.hours) as hours'))
+                ->groupBy('clients.id', 'clients.name', 'clients.budget_per_month')
                 ->orderByDesc('hours')
                 ->get(),
             'taskHours' => (clone $base)
@@ -91,19 +100,19 @@ class ReportController extends Controller
             'clientHours' => [
                 'section' => 'clientHours',
                 'field' => 'name',
-                'column' => 'Name',
+                'columns' => ['Name', 'Time', 'Excess Time'],
                 'filename' => 'scalyn-hours-per-client.csv',
             ],
             'taskHours' => [
                 'section' => 'taskHours',
                 'field' => 'title',
-                'column' => 'Task',
+                'columns' => ['Task', 'Time'],
                 'filename' => 'scalyn-hours-per-task.csv',
             ],
             'userHours' => [
                 'section' => 'userHours',
                 'field' => 'name',
-                'column' => 'Name',
+                'columns' => ['Name', 'Time'],
                 'filename' => 'scalyn-hours-per-employee.csv',
             ],
             default => abort(404),

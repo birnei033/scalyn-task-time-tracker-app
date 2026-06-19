@@ -23,7 +23,7 @@ class TimeEntry extends Model
     {
         return [
             'date' => 'date',
-            'hours' => 'decimal:2',
+            'hours' => 'decimal:4',
         ];
     }
 

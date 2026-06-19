@@ -1,23 +1,18 @@
 <!DOCTYPE html>
 <html
     lang="{{ str_replace('_', '-', app()->getLocale()) }}"
-    data-theme-source="guest"
-    data-theme-preference="system"
 >
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ config('app.name', 'Scalyn Task Time Tracker') }}</title>
-    <x-theme-init source="guest" />
+    <x-theme-init />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
     <main class="guest-shell d-flex align-items-center py-4 py-lg-5">
         <div class="container guest-panel">
-            <div class="guest-toolbar d-flex justify-content-end mb-4">
-                <x-theme-toggle />
-            </div>
             <div class="row align-items-stretch g-4 g-lg-5">
                 <div class="col-lg-5 d-flex">
                     <div class="guest-brand-panel w-100">
@@ -32,7 +27,7 @@
                         </div>
 
                         <p class="guest-brand-copy mb-4">
-                            Track client work, review hours, and keep projects moving with a calm, responsive workspace built around Scalyn's blue brand system.
+                            Track client work, review time, and keep projects moving with a calm, responsive workspace built around Scalyn's blue brand system.
                         </p>
 
                         <div class="guest-metric-grid mb-4">

@@ -1,5 +1,13 @@
 <x-app-layout>
     <x-slot name="header">{{ $task->title }}</x-slot>
+    @php
+        $showTaskPriorityModal = old('modal_form') === 'task-priority-modal';
+        $editingEntryId = old('editing_entry', request('editing_entry'));
+        $selectedEntry = $editingEntryId
+            ? ($task->timeEntries->firstWhere('id', (int) $editingEntryId) ?: \App\Models\TimeEntry::with(['user', 'task.client'])->find($editingEntryId))
+            : null;
+        $showTimeEntryEditModal = old('modal_form') === 'time-entry-edit-modal' || filled($editingEntryId);
+    @endphp
 
     <section class="page-hero p-4 p-lg-5 mb-4">
         <div class="row align-items-center g-4">
@@ -7,7 +15,7 @@
                 <div class="page-kicker mb-2">Task details</div>
                 <h2 class="page-title h1 mb-3">{{ $task->title }}</h2>
                 <p class="page-subtitle mb-0">
-                    Review the task scope, progress history, and logged hours in a cleaner layout.
+                    Review the task scope, progress history, and logged time in a cleaner layout.
                 </p>
             </div>
             <div class="col-lg-4 d-flex flex-column align-items-lg-end gap-3">
@@ -26,6 +34,18 @@
     </section>
 
     @include('tasks._details')
+    @include('tasks._priority-modal', [
+        'selectedTask' => $task,
+        'showModal' => $showTaskPriorityModal,
+    ])
+    @include('time-entries._edit-modal', [
+        'selectedEntry' => $selectedEntry,
+        'showModal' => $showTimeEntryEditModal,
+        'tasks' => collect(),
+        'users' => \App\Models\User::orderBy('name')->get(),
+        'contextTask' => $task,
+        'returnTo' => route('tasks.show', $task).'#logged-time-pane',
+    ])
     @include('tasks._log-time-modal', [
         'selectedTask' => $task,
         'showModal' => false,

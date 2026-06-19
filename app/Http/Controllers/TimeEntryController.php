@@ -6,6 +6,7 @@ use App\Models\Task;
 use App\Models\TimeEntry;
 use App\Models\User;
 use App\Support\RichText;
+use App\Support\TimeDisplay;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
@@ -24,7 +25,18 @@ class TimeEntryController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        return view('time-entries.index', array_merge(compact('entries'), $this->formData(new TimeEntry)));
+        $editingEntryId = old('editing_entry', request('editing_entry'));
+        $selectedEntry = $editingEntryId
+            ? ($entries->firstWhere('id', (int) $editingEntryId) ?: TimeEntry::with(['user', 'task.client'])->find($editingEntryId))
+            : null;
+
+        return view('time-entries.index', array_merge(
+            compact('entries', 'selectedEntry'),
+            [
+                'showEditModal' => old('modal_form') === 'time-entry-edit-modal' || request()->filled('editing_entry'),
+            ],
+            $this->formData(new TimeEntry)
+        ));
     }
 
     public function create()
@@ -39,6 +51,8 @@ class TimeEntryController extends Controller
         Gate::authorize('create', TimeEntry::class);
 
         $data = $this->validateEntry($request);
+        $data['hours'] = TimeDisplay::minutesToHours($data['minutes']);
+        unset($data['minutes']);
         $data['user_id'] = $request->user()->canManageTeam() ? $data['user_id'] : $request->user()->id;
         $data['notes'] = RichText::clean($data['notes'] ?? null);
 
@@ -66,20 +80,30 @@ class TimeEntryController extends Controller
         Gate::authorize('update', $timeEntry);
 
         $data = $this->validateEntry($request);
+        $data['hours'] = TimeDisplay::minutesToHours($data['minutes']);
+        unset($data['minutes']);
         $data['user_id'] = $request->user()->canManageTeam() ? $data['user_id'] : $timeEntry->user_id;
         $data['notes'] = RichText::clean($data['notes'] ?? null);
         $timeEntry->update($data);
 
-        return redirect()->route('time-entries.index')->with('status', 'Time entry updated.');
+        $returnTo = $request->input('return_to');
+
+        return $returnTo
+            ? redirect()->to($returnTo)->with('status', 'Time entry updated.')
+            : redirect()->route('time-entries.index')->with('status', 'Time entry updated.');
     }
 
-    public function destroy(TimeEntry $timeEntry)
+    public function destroy(Request $request, TimeEntry $timeEntry)
     {
         Gate::authorize('delete', $timeEntry);
 
         $timeEntry->delete();
 
-        return redirect()->route('time-entries.index')->with('status', 'Time entry deleted.');
+        $returnTo = $request->input('return_to');
+
+        return $returnTo
+            ? redirect()->to($returnTo)->with('status', 'Time entry deleted.')
+            : redirect()->route('time-entries.index')->with('status', 'Time entry deleted.');
     }
 
     private function formData(TimeEntry $entry): array
@@ -102,8 +126,13 @@ class TimeEntryController extends Controller
             'user_id' => [$request->user()->canManageTeam() ? 'required' : 'nullable', 'exists:users,id'],
             'task_id' => ['required', 'exists:tasks,id'],
             'date' => ['required', 'date'],
-            'hours' => ['required', 'numeric', 'min:0.25', 'max:24'],
+            'minutes' => $this->minutesRules(),
             'notes' => ['nullable', 'string'],
         ]);
+    }
+
+    private function minutesRules(): array
+    {
+        return ['required', 'integer', 'min:1', 'max:480'];
     }
 }

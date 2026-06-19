@@ -11,25 +11,25 @@
         @csrf
 
         <div class="mb-3">
-            <x-input-label for="name" :value="__('Name')" />
+            <x-input-label for="name" :value="__('Name')" required />
             <x-text-input id="name" class="w-100 @error('name') is-invalid @enderror" name="name" value="{{ old('name') }}" required autofocus autocomplete="name" />
             <x-input-error :messages="$errors->get('name')" class="mt-2" />
         </div>
 
         <div class="mb-3">
-            <x-input-label for="email" :value="__('Email')" />
+            <x-input-label for="email" :value="__('Email')" required />
             <x-text-input id="email" class="w-100 @error('email') is-invalid @enderror" type="email" name="email" value="{{ old('email') }}" required autocomplete="username" />
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
 
         <div class="mb-3">
-            <x-input-label for="password" :value="__('Password')" />
+            <x-input-label for="password" :value="__('Password')" required />
             <x-text-input id="password" class="w-100 @error('password') is-invalid @enderror" type="password" name="password" required autocomplete="new-password" />
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>
 
         <div class="mb-3">
-            <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
+            <x-input-label for="password_confirmation" :value="__('Confirm Password')" required />
             <x-text-input id="password_confirmation" class="w-100 @error('password_confirmation') is-invalid @enderror" type="password" name="password_confirmation" required autocomplete="new-password" />
             <x-input-error :messages="$errors->get('password_confirmation')" class="mt-2" />
         </div>

@@ -2,6 +2,7 @@
     <form id="delete-confirmation-form" method="POST" action="">
         @csrf
         <input type="hidden" name="_method" value="DELETE" id="delete-confirmation-method">
+        <input type="hidden" name="return_to" value="" id="delete-confirmation-return-to">
 
         <div class="modal-header">
             <div>

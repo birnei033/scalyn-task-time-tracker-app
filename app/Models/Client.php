@@ -17,6 +17,7 @@ class Client extends Model
         'email',
         'company',
         'status',
+        'budget_per_month',
         'notes',
         'archived_at',
     ];
@@ -24,6 +25,7 @@ class Client extends Model
     protected function casts(): array
     {
         return [
+            'budget_per_month' => 'integer',
             'archived_at' => 'datetime',
         ];
     }
@@ -31,6 +33,11 @@ class Client extends Model
     public function tasks()
     {
         return $this->hasMany(Task::class);
+    }
+
+    public function timeEntries()
+    {
+        return $this->hasManyThrough(TimeEntry::class, Task::class);
     }
 
     public function scopeActive($query)

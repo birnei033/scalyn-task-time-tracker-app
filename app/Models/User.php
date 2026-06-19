@@ -23,7 +23,6 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'theme_preference',
         'team_id',
     ];
 

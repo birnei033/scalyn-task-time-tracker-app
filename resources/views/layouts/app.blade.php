@@ -1,18 +1,13 @@
 <!DOCTYPE html>
-@php
-    $themePreference = auth()->user()?->theme_preference;
-@endphp
 <html
     lang="{{ str_replace('_', '-', app()->getLocale()) }}"
-    data-theme-source="account"
-    data-theme-preference="{{ $themePreference ?? 'system' }}"
 >
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ config('app.name', 'Scalyn Task Time Tracker') }}</title>
-    <x-theme-init source="account" :preference="$themePreference" />
+    <x-theme-init />
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body>
@@ -49,14 +44,6 @@
                         </div>
 
                         <div class="d-flex flex-wrap align-items-center justify-content-end gap-2">
-                            <form method="POST" action="{{ route('profile.update') }}" class="d-inline-flex align-items-center">
-                                @csrf
-                                @method('PATCH')
-                                <input type="hidden" name="name" value="{{ auth()->user()->name }}">
-                                <input type="hidden" name="email" value="{{ auth()->user()->email }}">
-                                <input type="hidden" name="theme_preference" value="{{ $themePreference ?? 'system' }}" data-theme-preference-input>
-                                <x-theme-toggle type="submit" />
-                            </form>
                             <span class="badge badge-soft text-capitalize">{{ auth()->user()->role }}</span>
                             <span class="badge text-bg-light border d-none d-md-inline-flex">{{ auth()->user()->name }}</span>
                             <form method="POST" action="{{ route('logout') }}">

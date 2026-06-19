@@ -7,7 +7,29 @@
                 <div><strong>Client:</strong> {{ $task->client->name }}</div>
                 <div><strong>Assigned:</strong> {{ $task->assignedUser?->name ?: 'Unassigned' }}</div>
                 <div class="d-flex align-items-center gap-2"><strong>Status:</strong> <span class="badge {{ $task->statusBadgeClass() }}">{{ $task->statusLabel() }}</span></div>
-                <div class="d-flex align-items-center gap-2"><strong>Priority:</strong> <span class="badge {{ $task->priorityBadgeClass() }}">{{ $task->priorityLabel() }}</span></div>
+                <div class="d-flex align-items-center gap-2">
+                    <strong>Priority:</strong>
+                    @can('update', $task)
+                        <button
+                            type="button"
+                            class="btn btn-link p-0 text-decoration-none align-baseline"
+                            aria-label="Update priority for {{ $task->title }}"
+                            data-task-priority-trigger
+                            data-task-id="{{ $task->id }}"
+                            data-task-title="{{ $task->title }}"
+                            data-task-client="{{ $task->client->name }}"
+                            data-task-priority="{{ $task->priority }}"
+                            data-task-priority-label="{{ $task->priorityLabel() }}"
+                            data-task-priority-class="{{ $task->priorityBadgeClass() }}"
+                            data-task-priority-action="{{ route('tasks.priority.update', $task) }}"
+                            data-task-return-to="{{ request()->fullUrl() }}"
+                        >
+                            <span class="badge {{ $task->priorityBadgeClass() }}">{{ $task->priorityLabel() }}</span>
+                        </button>
+                    @else
+                        <span class="badge {{ $task->priorityBadgeClass() }}">{{ $task->priorityLabel() }}</span>
+                    @endcan
+                </div>
             </div>
         </div>
     </div>
@@ -151,7 +173,8 @@
                                     <th>Date</th>
                                     <th>User</th>
                                     <th>Notes</th>
-                                    <th class="text-end">Hours</th>
+                                    <th class="text-end">Time</th>
+                                    <th class="text-end"><span class="visually-hidden">Actions</span></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -160,11 +183,48 @@
                                         <td>{{ $entry->date->format('M d, Y') }}</td>
                                         <td>{{ $entry->user->name }}</td>
                                         <td>{{ \App\Support\RichText::excerpt($entry->notes) }}</td>
-                                        <td class="text-end fw-semibold">{{ number_format((float) $entry->hours, 2) }}</td>
+                                        <td class="text-end fw-semibold">{{ \App\Support\TimeDisplay::formatHours($entry->hours) }}</td>
+                                        <td class="text-end">
+                                            <div class="d-inline-flex gap-2">
+                                                @can('update', $entry)
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-sm btn-outline-secondary"
+                                                        aria-label="Edit time entry for {{ $entry->task->title }}"
+                                                        data-time-entry-edit-trigger
+                                                        data-time-entry-edit-action="{{ route('time-entries.update', $entry) }}"
+                                                        data-time-entry-edit-id="{{ $entry->id }}"
+                                                        data-time-entry-edit-user-id="{{ $entry->user_id }}"
+                                                        data-time-entry-edit-task-id="{{ $entry->task_id }}"
+                                                        data-time-entry-edit-date="{{ $entry->date->toDateString() }}"
+                                                        data-time-entry-edit-minutes="{{ \App\Support\TimeDisplay::hoursToMinutes($entry->hours) }}"
+                                                        data-time-entry-edit-notes="{{ e($entry->notes ?? '') }}"
+                                                        data-time-entry-edit-return-to="{{ route('tasks.show', $task).'#logged-time-pane' }}"
+                                                    >
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                @endcan
+                                                @can('delete', $entry)
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-sm btn-outline-danger"
+                                                        data-delete-confirm
+                                                        data-delete-action="{{ route('time-entries.destroy', $entry) }}"
+                                                        data-delete-title="Delete Logged Time"
+                                                        data-delete-message="Delete this logged time entry for {{ $entry->task->title }}? This action cannot be undone."
+                                                        data-delete-submit="Delete Time Entry"
+                                                        data-delete-return-to="{{ route('tasks.show', $task).'#logged-time-pane' }}"
+                                                        aria-label="Delete time entry for {{ $entry->task->title }}"
+                                                    >
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                @endcan
+                                            </div>
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4">
+                                        <td colspan="5">
                                             <div class="table-empty">No time logged for this task yet.</div>
                                         </td>
                                     </tr>

@@ -28,12 +28,8 @@ class ProfileController extends Controller
     public function update(ProfileUpdateRequest $request): RedirectResponse
     {
         $validated = $request->validated();
-        $themePreference = array_key_exists('theme_preference', $validated)
-            ? ($validated['theme_preference'] === 'system' ? null : $validated['theme_preference'])
-            : $request->user()->theme_preference;
 
         $request->user()->fill(Arr::only($validated, ['name', 'email']));
-        $request->user()->theme_preference = $themePreference;
 
         if ($request->user()->isDirty('email')) {
             $request->user()->email_verified_at = null;

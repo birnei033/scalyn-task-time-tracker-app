@@ -4,7 +4,7 @@
 <div class="row g-3">
     @if ($canManageTask || ! $task->exists)
         <div class="col-12">
-            <label class="form-label">Task Title</label>
+            <label class="form-label">Task Title <x-required-indicator /></label>
             <input
                 class="form-control @error('title') is-invalid @enderror"
                 name="title"
@@ -15,7 +15,7 @@
         </div>
 
         <div class="col-lg-6">
-            <label class="form-label">Client</label>
+            <label class="form-label">Client <x-required-indicator /></label>
             <select class="form-select @error('client_id') is-invalid @enderror" name="client_id" required>
                 <option value="">Choose client</option>
                 @foreach ($clients as $client)
@@ -25,8 +25,8 @@
             @error('client_id')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
         </div>
         <div class="col-lg-6">
-            <label class="form-label">Assigned User</label>
-            <select class="form-select @error('assigned_user_id') is-invalid @enderror" name="assigned_user_id">
+            <label class="form-label">Assigned User <x-required-indicator /></label>
+            <select class="form-select @error('assigned_user_id') is-invalid @enderror" name="assigned_user_id" required>
                 <option value="">Unassigned</option>
                 @foreach ($users as $user)
                     <option value="{{ $user->id }}" @selected(old('assigned_user_id', $task->assigned_user_id) == $user->id)>{{ $user->name }}</option>
@@ -42,13 +42,14 @@
                 placeholder="Describe the work, goals, and context for this task."
                 :rows="7"
                 id="task-description"
+                :required="true"
             />
         </div>
     @endif
 
     <div class="col-lg-6">
-        <label class="form-label">Status</label>
-        <select class="form-select @error('status') is-invalid @enderror" name="status">
+        <label class="form-label">Status <x-required-indicator /></label>
+        <select class="form-select @error('status') is-invalid @enderror" name="status" required>
             @foreach (\App\Models\Task::statusOptions() as $value => $label)
                 <option value="{{ $value }}" @selected(old('status', $task->status ?: 'open') === $value)>{{ $label }}</option>
             @endforeach
@@ -58,8 +59,8 @@
 
     @if ($canManageTask || ! $task->exists)
         <div class="col-lg-6">
-            <label class="form-label">Priority</label>
-            <select class="form-select @error('priority') is-invalid @enderror" name="priority">
+            <label class="form-label">Priority <x-required-indicator /></label>
+            <select class="form-select @error('priority') is-invalid @enderror" name="priority" required>
                 @foreach (['low' => 'Low', 'medium' => 'Medium', 'high' => 'High'] as $value => $label)
                     <option value="{{ $value }}" @selected(old('priority', $task->priority ?: 'medium') === $value)>{{ $label }}</option>
                 @endforeach

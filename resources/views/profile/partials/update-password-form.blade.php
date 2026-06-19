@@ -16,19 +16,19 @@
             @method('put')
 
             <div class="mb-3">
-                <x-input-label for="update_password_current_password" :value="__('Current Password')" class="profile-label" />
+                <x-input-label for="update_password_current_password" :value="__('Current Password')" class="profile-label" required />
                 <x-text-input id="update_password_current_password" name="current_password" type="password" class="form-control profile-input mt-1" autocomplete="current-password" />
                 <x-input-error :messages="$errors->updatePassword->get('current_password')" class="mt-2" />
             </div>
 
             <div class="mb-3">
-                <x-input-label for="update_password_password" :value="__('New Password')" class="profile-label" />
+                <x-input-label for="update_password_password" :value="__('New Password')" class="profile-label" required />
                 <x-text-input id="update_password_password" name="password" type="password" class="form-control profile-input mt-1" autocomplete="new-password" />
                 <x-input-error :messages="$errors->updatePassword->get('password')" class="mt-2" />
             </div>
 
             <div class="mb-4">
-                <x-input-label for="update_password_password_confirmation" :value="__('Confirm Password')" class="profile-label" />
+                <x-input-label for="update_password_password_confirmation" :value="__('Confirm Password')" class="profile-label" required />
                 <x-text-input id="update_password_password_confirmation" name="password_confirmation" type="password" class="form-control profile-input mt-1" autocomplete="new-password" />
                 <x-input-error :messages="$errors->updatePassword->get('password_confirmation')" class="mt-2" />
             </div>

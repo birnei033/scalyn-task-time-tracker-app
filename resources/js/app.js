@@ -8,85 +8,6 @@ window.bootstrap = bootstrap;
 
 Alpine.start();
 
-const themeStorageKey = 'scalyn-theme-preference';
-
-function getSystemTheme() {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
-function isTheme(theme) {
-    return theme === 'light' || theme === 'dark';
-}
-
-function getResolvedTheme() {
-    const root = document.documentElement;
-    const source = root.dataset.scalynThemeSource || root.dataset.themeSource || 'guest';
-    const preference = root.dataset.scalynThemePreference || 'system';
-    let storedTheme = null;
-
-    try {
-        storedTheme = window.localStorage.getItem(themeStorageKey);
-    } catch (error) {
-        storedTheme = null;
-    }
-
-    if (source === 'account') {
-        if (isTheme(preference)) {
-            return preference;
-        }
-    }
-
-    if (isTheme(storedTheme)) {
-        return storedTheme;
-    }
-
-    return getSystemTheme();
-}
-
-function applyTheme(theme, persist = false) {
-    if (!isTheme(theme)) {
-        return;
-    }
-
-    document.documentElement.dataset.bsTheme = theme;
-    document.documentElement.dataset.scalynThemeResolved = theme;
-
-    if (persist) {
-        try {
-            window.localStorage.setItem(themeStorageKey, theme);
-        } catch (error) {
-            // Ignore storage failures and keep the current session theme.
-        }
-    }
-}
-
-function clearStoredTheme() {
-    try {
-        window.localStorage.removeItem(themeStorageKey);
-    } catch (error) {
-        // Ignore storage failures.
-    }
-}
-
-function syncStoredThemeFromForm(form) {
-    const selectedTheme = form.querySelector('input[name="theme_preference"]:checked')?.value
-        || form.querySelector('[data-theme-preference-input]')?.value
-        || null;
-
-    if (selectedTheme === 'system') {
-        clearStoredTheme();
-        return;
-    }
-
-    if (isTheme(selectedTheme)) {
-        try {
-            window.localStorage.setItem(themeStorageKey, selectedTheme);
-        } catch (error) {
-            // Ignore storage failures.
-        }
-    }
-}
-
 function setLoadingState(form) {
     form.querySelectorAll('[data-rich-editor-editor]').forEach((editor) => {
         syncRichEditor(editor);
@@ -181,9 +102,58 @@ function getLocalDateInputValue(date = new Date()) {
     return `${year}-${month}-${day}`;
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-    applyTheme(getResolvedTheme());
+function getRelativeDateRangeFromView(view, anchorDate = new Date()) {
+    const normalizedDate = new Date(anchorDate.getFullYear(), anchorDate.getMonth(), anchorDate.getDate());
 
+    if (view === 'daily') {
+        return {
+            from: getLocalDateInputValue(normalizedDate),
+            to: getLocalDateInputValue(normalizedDate),
+        };
+    }
+
+    if (view === 'weekly') {
+        const weekStart = new Date(normalizedDate);
+        const dayOffset = (weekStart.getDay() + 6) % 7;
+        weekStart.setDate(weekStart.getDate() - dayOffset);
+
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+
+        return {
+            from: getLocalDateInputValue(weekStart),
+            to: getLocalDateInputValue(weekEnd),
+        };
+    }
+
+    const monthStart = new Date(normalizedDate.getFullYear(), normalizedDate.getMonth(), 1);
+    const monthEnd = new Date(normalizedDate.getFullYear(), normalizedDate.getMonth() + 1, 0);
+
+    return {
+        from: getLocalDateInputValue(monthStart),
+        to: getLocalDateInputValue(monthEnd),
+    };
+}
+
+function initializeRelativeDateRangeFilter(form) {
+    const viewSelect = form.querySelector('[data-relative-date-range-view-select]') || form.querySelector('select[name="view"]');
+    const fromInput = form.querySelector('[data-relative-date-range-from-input]') || form.querySelector('input[name="from"]');
+    const toInput = form.querySelector('[data-relative-date-range-to-input]') || form.querySelector('input[name="to"]');
+
+    if (!viewSelect || !fromInput || !toInput) {
+        return;
+    }
+
+    const syncDateRange = () => {
+        const range = getRelativeDateRangeFromView(viewSelect.value);
+        fromInput.value = range.from;
+        toInput.value = range.to;
+    };
+
+    viewSelect.addEventListener('change', syncDateRange);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('[data-auto-open="true"]').forEach((element) => {
         bootstrap.Modal.getOrCreateInstance(element).show();
     });
@@ -224,19 +194,8 @@ window.addEventListener('DOMContentLoaded', () => {
         initializeRichEditor(container);
     });
 
-    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
-        button.addEventListener('click', () => {
-            const form = button.closest('form');
-            const currentTheme = document.documentElement.dataset.bsTheme || getResolvedTheme();
-            const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
-            const preferenceInput = form?.querySelector('[data-theme-preference-input]');
-
-            if (preferenceInput) {
-                preferenceInput.value = nextTheme;
-            }
-
-            applyTheme(nextTheme, true);
-        });
+    document.querySelectorAll('[data-timesheet-filter-form], [data-relative-date-range-form]').forEach((form) => {
+        initializeRelativeDateRangeFilter(form);
     });
 
     const taskStatusModalElement = document.getElementById('task-status-modal');
@@ -336,6 +295,172 @@ window.addEventListener('DOMContentLoaded', () => {
         clearTaskStatusValidationState();
     });
 
+    const taskBulkStatusForm = document.querySelector('[data-task-bulk-status-form]');
+    const taskBulkStatusCheckboxes = Array.from(document.querySelectorAll('[data-task-bulk-status-checkbox]'));
+    const taskBulkStatusSelectAll = document.querySelector('[data-task-bulk-status-select-all]');
+    const taskBulkStatusSelect = taskBulkStatusForm?.querySelector('[data-task-bulk-status-select]');
+    const taskBulkStatusCount = taskBulkStatusForm?.querySelector('[data-task-bulk-status-count]');
+    const taskBulkStatusApply = taskBulkStatusForm?.querySelector('[data-task-bulk-status-apply]');
+    const taskBulkStatusPanel = taskBulkStatusForm?.closest('[data-task-bulk-status-panel]');
+    const taskBulkStatusDefaultSelectValue = taskBulkStatusSelect?.value || '';
+
+    const syncTaskBulkStatusState = () => {
+        const selectedCount = taskBulkStatusCheckboxes.filter((checkbox) => checkbox.checked).length;
+        const hasVisibleTasks = taskBulkStatusCheckboxes.length > 0;
+
+        if (taskBulkStatusCount) {
+            taskBulkStatusCount.textContent = `${selectedCount} selected`;
+        }
+
+        if (taskBulkStatusSelectAll) {
+            const allSelected = hasVisibleTasks && selectedCount === taskBulkStatusCheckboxes.length;
+            taskBulkStatusSelectAll.checked = allSelected;
+            taskBulkStatusSelectAll.indeterminate = selectedCount > 0 && !allSelected;
+            taskBulkStatusSelectAll.disabled = !hasVisibleTasks;
+        }
+
+        if (taskBulkStatusApply) {
+            const hasStatus = Boolean(taskBulkStatusSelect?.value);
+            taskBulkStatusApply.disabled = selectedCount === 0 || !hasStatus;
+        }
+
+        if (taskBulkStatusPanel) {
+            taskBulkStatusPanel.dataset.bulkStatusState = selectedCount > 0 ? 'active' : 'idle';
+            taskBulkStatusPanel.classList.toggle('opacity-75', selectedCount === 0);
+        }
+    };
+
+    taskBulkStatusSelectAll?.addEventListener('change', () => {
+        const checked = taskBulkStatusSelectAll.checked;
+        taskBulkStatusCheckboxes.forEach((checkbox) => {
+            checkbox.checked = checked;
+        });
+
+        syncTaskBulkStatusState();
+    });
+
+    taskBulkStatusCheckboxes.forEach((checkbox) => {
+        checkbox.addEventListener('change', syncTaskBulkStatusState);
+    });
+
+    taskBulkStatusSelect?.addEventListener('change', syncTaskBulkStatusState);
+
+    taskBulkStatusForm?.addEventListener('submit', () => {
+        if (taskBulkStatusApply) {
+            taskBulkStatusApply.disabled = true;
+        }
+    });
+
+    syncTaskBulkStatusState();
+
+    const taskPriorityModalElement = document.getElementById('task-priority-modal');
+    const taskPriorityModal = taskPriorityModalElement ? bootstrap.Modal.getOrCreateInstance(taskPriorityModalElement) : null;
+    const taskPriorityForm = taskPriorityModalElement?.querySelector('form');
+    const taskPriorityTaskId = taskPriorityModalElement?.querySelector('[data-task-priority-task-id]');
+    const taskPriorityReturnTo = taskPriorityModalElement?.querySelector('[data-task-priority-return-to]');
+    const taskPriorityTitle = taskPriorityModalElement?.querySelector('[data-task-priority-task-title]');
+    const taskPriorityClient = taskPriorityModalElement?.querySelector('[data-task-priority-task-client]');
+    const taskPriorityBadge = taskPriorityModalElement?.querySelector('[data-task-priority-task-badge]');
+    const taskPrioritySelect = taskPriorityModalElement?.querySelector('[data-task-priority-select]');
+    const taskPriorityDefaultTitle = taskPriorityTitle?.textContent || 'Choose a task priority from the table.';
+    const taskPriorityDefaultClient = taskPriorityClient?.textContent || 'The modal will populate from the row you choose.';
+    const taskPriorityDefaultBadgeText = taskPriorityBadge?.textContent || 'Not selected';
+    const taskPriorityDefaultBadgeClass = taskPriorityBadge?.className || 'badge badge-soft';
+    const taskPriorityDefaultValue = taskPrioritySelect?.value || 'medium';
+    const taskPriorityDefaultReturnTo = taskPriorityReturnTo?.value || window.location.href;
+
+    const clearTaskPriorityValidationState = () => {
+        taskPriorityForm?.querySelectorAll('.is-invalid').forEach((element) => {
+            element.classList.remove('is-invalid');
+        });
+
+        taskPriorityForm?.querySelectorAll('.invalid-feedback').forEach((element) => {
+            element.style.display = 'none';
+        });
+    };
+
+    document.querySelectorAll('[data-task-priority-trigger]').forEach((trigger) => {
+        trigger.addEventListener('click', () => {
+            if (!taskPriorityModal) {
+                return;
+            }
+
+            clearTaskPriorityValidationState();
+
+            const title = trigger.getAttribute('data-task-title') || taskPriorityDefaultTitle;
+            const client = trigger.getAttribute('data-task-client') || taskPriorityDefaultClient;
+            const priority = trigger.getAttribute('data-task-priority') || taskPriorityDefaultValue;
+            const priorityLabel = trigger.getAttribute('data-task-priority-label') || taskPriorityDefaultBadgeText;
+            const priorityClass = trigger.getAttribute('data-task-priority-class') || 'badge badge-soft';
+            const action = trigger.getAttribute('data-task-priority-action') || '';
+            const returnTo = trigger.getAttribute('data-task-return-to') || taskPriorityDefaultReturnTo;
+
+            if (taskPriorityForm) {
+                taskPriorityForm.setAttribute('action', action);
+            }
+
+            if (taskPriorityTaskId) {
+                taskPriorityTaskId.value = trigger.getAttribute('data-task-id') || '';
+            }
+
+            if (taskPriorityReturnTo) {
+                taskPriorityReturnTo.value = returnTo;
+            }
+
+            if (taskPriorityTitle) {
+                taskPriorityTitle.textContent = title;
+            }
+
+            if (taskPriorityClient) {
+                taskPriorityClient.textContent = client;
+            }
+
+            if (taskPriorityBadge) {
+                taskPriorityBadge.className = `badge ${priorityClass}`.trim();
+                taskPriorityBadge.textContent = priorityLabel;
+            }
+
+            if (taskPrioritySelect) {
+                taskPrioritySelect.value = priority;
+            }
+
+            taskPriorityModal.show();
+        });
+    });
+
+    taskPriorityModalElement?.addEventListener('hidden.bs.modal', () => {
+        if (taskPriorityForm) {
+            taskPriorityForm.setAttribute('action', '');
+        }
+
+        if (taskPriorityTaskId) {
+            taskPriorityTaskId.value = '';
+        }
+
+        if (taskPriorityReturnTo) {
+            taskPriorityReturnTo.value = taskPriorityDefaultReturnTo;
+        }
+
+        if (taskPriorityTitle) {
+            taskPriorityTitle.textContent = taskPriorityDefaultTitle;
+        }
+
+        if (taskPriorityClient) {
+            taskPriorityClient.textContent = taskPriorityDefaultClient;
+        }
+
+        if (taskPriorityBadge) {
+            taskPriorityBadge.className = taskPriorityDefaultBadgeClass;
+            taskPriorityBadge.textContent = taskPriorityDefaultBadgeText;
+        }
+
+        if (taskPrioritySelect) {
+            taskPrioritySelect.value = taskPriorityDefaultValue;
+        }
+
+        clearTaskPriorityValidationState();
+    });
+
     const taskLogModalElement = document.getElementById('task-log-time-modal');
     const taskLogModal = taskLogModalElement ? bootstrap.Modal.getOrCreateInstance(taskLogModalElement) : null;
     const taskLogForm = taskLogModalElement?.querySelector('form');
@@ -345,7 +470,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const taskLogStatusBadge = taskLogModalElement?.querySelector('[data-task-log-time-task-status-badge]');
     const taskLogStatusSelect = taskLogModalElement?.querySelector('[data-task-log-time-status]');
     const taskLogDateInput = taskLogModalElement?.querySelector('[data-task-log-time-date]');
-    const taskLogHoursInput = taskLogModalElement?.querySelector('[data-task-log-time-hours]');
+    const taskLogMinutesInput = taskLogModalElement?.querySelector('[data-task-log-time-minutes]');
     const taskLogUserInput = taskLogModalElement?.querySelector('[data-task-log-time-user]');
     const taskLogNotesEditor = taskLogModalElement?.querySelector('[data-rich-editor-editor]');
     const taskLogDefaultTitle = taskLogTitle?.textContent || 'Choose a task from the table to log time.';
@@ -412,8 +537,8 @@ window.addEventListener('DOMContentLoaded', () => {
                 taskLogDateInput.value = taskLogDefaultDateValue;
             }
 
-            if (taskLogHoursInput) {
-                taskLogHoursInput.value = '';
+            if (taskLogMinutesInput) {
+                taskLogMinutesInput.value = '';
             }
 
             if (taskLogUserInput) {
@@ -452,8 +577,8 @@ window.addEventListener('DOMContentLoaded', () => {
             taskLogDateInput.value = taskLogDefaultDateValue;
         }
 
-        if (taskLogHoursInput) {
-            taskLogHoursInput.value = '';
+        if (taskLogMinutesInput) {
+            taskLogMinutesInput.value = '';
         }
 
         if (taskLogUserInput) {
@@ -464,13 +589,121 @@ window.addEventListener('DOMContentLoaded', () => {
         clearTaskLogValidationState();
     });
 
+    const timeEntryEditModalElement = document.getElementById('time-entry-edit-modal');
+    const timeEntryEditModal = timeEntryEditModalElement ? bootstrap.Modal.getOrCreateInstance(timeEntryEditModalElement) : null;
+    const timeEntryEditForm = timeEntryEditModalElement?.querySelector('form');
+    const timeEntryEditUserInput = timeEntryEditModalElement?.querySelector('[name="user_id"]');
+    const timeEntryEditTaskInput = timeEntryEditModalElement?.querySelector('[name="task_id"]');
+    const timeEntryEditDateInput = timeEntryEditModalElement?.querySelector('[name="date"]');
+    const timeEntryEditMinutesInput = timeEntryEditModalElement?.querySelector('[name="minutes"]');
+    const timeEntryEditEditingInput = timeEntryEditModalElement?.querySelector('[name="editing_entry"]');
+    const timeEntryEditReturnToInput = timeEntryEditModalElement?.querySelector('[name="return_to"]');
+    const timeEntryEditNotesEditor = timeEntryEditModalElement?.querySelector('[data-rich-editor-editor]');
+    const timeEntryEditDefaultAction = timeEntryEditForm?.getAttribute('action') || '';
+    const timeEntryEditDefaultReturnTo = timeEntryEditReturnToInput?.value || '';
+    const clearTimeEntryEditValidationState = () => {
+        timeEntryEditForm?.querySelectorAll('.is-invalid').forEach((element) => {
+            element.classList.remove('is-invalid');
+        });
+
+        timeEntryEditForm?.querySelectorAll('.invalid-feedback').forEach((element) => {
+            element.style.display = 'none';
+        });
+    };
+
+    document.querySelectorAll('[data-time-entry-edit-trigger]').forEach((trigger) => {
+        trigger.addEventListener('click', (event) => {
+            event.preventDefault();
+
+            if (!timeEntryEditModal) {
+                return;
+            }
+
+            clearTimeEntryEditValidationState();
+
+            if (timeEntryEditForm) {
+                timeEntryEditForm.setAttribute('action', trigger.getAttribute('data-time-entry-edit-action') || timeEntryEditDefaultAction);
+            }
+
+            if (timeEntryEditReturnToInput) {
+                timeEntryEditReturnToInput.value = trigger.getAttribute('data-time-entry-edit-return-to') || timeEntryEditDefaultReturnTo;
+            }
+
+            if (timeEntryEditEditingInput) {
+                timeEntryEditEditingInput.value = trigger.getAttribute('data-time-entry-edit-id') || '';
+            }
+
+            if (timeEntryEditUserInput) {
+                timeEntryEditUserInput.value = trigger.getAttribute('data-time-entry-edit-user-id') || '';
+            }
+
+            if (timeEntryEditTaskInput) {
+                timeEntryEditTaskInput.value = trigger.getAttribute('data-time-entry-edit-task-id') || '';
+            }
+
+            if (timeEntryEditDateInput) {
+                timeEntryEditDateInput.value = trigger.getAttribute('data-time-entry-edit-date') || '';
+            }
+
+            if (timeEntryEditMinutesInput) {
+                timeEntryEditMinutesInput.value = trigger.getAttribute('data-time-entry-edit-minutes') || '';
+            }
+
+            if (timeEntryEditNotesEditor) {
+                timeEntryEditNotesEditor.innerHTML = trigger.getAttribute('data-time-entry-edit-notes') || '';
+                syncRichEditor(timeEntryEditNotesEditor);
+            }
+
+            timeEntryEditModal.show();
+        });
+    });
+
+    timeEntryEditModalElement?.addEventListener('hidden.bs.modal', () => {
+        if (timeEntryEditForm) {
+            timeEntryEditForm.setAttribute('action', '');
+        }
+
+        if (timeEntryEditReturnToInput) {
+            timeEntryEditReturnToInput.value = timeEntryEditDefaultReturnTo;
+        }
+
+        if (timeEntryEditEditingInput) {
+            timeEntryEditEditingInput.value = '';
+        }
+
+        if (timeEntryEditUserInput) {
+            timeEntryEditUserInput.value = '';
+        }
+
+        if (timeEntryEditTaskInput) {
+            timeEntryEditTaskInput.value = '';
+        }
+
+        if (timeEntryEditDateInput) {
+            timeEntryEditDateInput.value = '';
+        }
+
+        if (timeEntryEditMinutesInput) {
+            timeEntryEditMinutesInput.value = '';
+        }
+
+        if (timeEntryEditNotesEditor) {
+            timeEntryEditNotesEditor.innerHTML = '';
+            syncRichEditor(timeEntryEditNotesEditor);
+        }
+
+        clearTimeEntryEditValidationState();
+    });
+
     const deleteModalElement = document.getElementById('delete-confirmation-modal');
     const deleteForm = document.getElementById('delete-confirmation-form');
     const deleteTitle = document.getElementById('delete-confirmation-title');
     const deleteMessage = document.getElementById('delete-confirmation-message');
     const deleteSubmit = document.getElementById('delete-confirmation-submit');
     const deleteMethod = document.getElementById('delete-confirmation-method');
+    const deleteReturnToInput = document.getElementById('delete-confirmation-return-to');
     const deleteModal = deleteModalElement ? bootstrap.Modal.getOrCreateInstance(deleteModalElement) : null;
+    const deleteDefaultReturnTo = deleteReturnToInput?.value || '';
 
     document.querySelectorAll('[data-delete-confirm]').forEach((trigger) => {
         trigger.addEventListener('click', () => {
@@ -487,6 +720,9 @@ window.addEventListener('DOMContentLoaded', () => {
             deleteForm.setAttribute('action', action);
             if (deleteMethod) {
                 deleteMethod.value = method;
+            }
+            if (deleteReturnToInput) {
+                deleteReturnToInput.value = trigger.getAttribute('data-delete-return-to') || deleteDefaultReturnTo;
             }
             deleteTitle && (deleteTitle.textContent = title);
             deleteMessage && (deleteMessage.textContent = message);
@@ -505,11 +741,13 @@ window.addEventListener('DOMContentLoaded', () => {
         if (deleteMethod) {
             deleteMethod.value = 'DELETE';
         }
+        if (deleteReturnToInput) {
+            deleteReturnToInput.value = deleteDefaultReturnTo;
+        }
     });
 
     document.querySelectorAll('form').forEach((form) => {
         form.addEventListener('submit', () => {
-            syncStoredThemeFromForm(form);
             setLoadingState(form);
         });
     });

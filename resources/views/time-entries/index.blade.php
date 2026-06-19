@@ -1,5 +1,8 @@
 <x-app-layout>
     <x-slot name="header">Time Entry</x-slot>
+    @php
+        $returnTo = route('time-entries.index', request()->except('editing_entry'));
+    @endphp
 
     <section class="page-hero p-4 p-lg-5 mb-4">
         <div class="row align-items-center g-4">
@@ -56,8 +59,8 @@
                         <th>User</th>
                         <th>Client / Task</th>
                         <th>Notes</th>
-                        <th class="text-end">Hours</th>
-                        <th></th>
+                        <th class="text-end">Time</th>
+                        <th class="text-end"><span class="visually-hidden">Actions</span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -70,13 +73,41 @@
                                 <div class="small text-muted">{{ $entry->task->title }}</div>
                             </td>
                             <td>{{ \App\Support\RichText::excerpt($entry->notes) }}</td>
-                            <td class="text-end fw-semibold">{{ number_format((float) $entry->hours, 2) }}</td>
+                            <td class="text-end fw-semibold">{{ \App\Support\TimeDisplay::formatHours($entry->hours) }}</td>
                             <td class="text-end">
-                                @can('update', $entry)
-                                    <a class="btn btn-sm btn-outline-secondary" href="{{ route('time-entries.edit', $entry) }}">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                @endcan
+                                <div class="d-inline-flex gap-2">
+                                    @can('update', $entry)
+                                        <a
+                                            class="btn btn-sm btn-outline-secondary"
+                                            href="{{ route('time-entries.edit', $entry) }}"
+                                            aria-label="Edit time entry for {{ $entry->task->title }}"
+                                            data-time-entry-edit-trigger
+                                            data-time-entry-edit-action="{{ route('time-entries.update', $entry) }}"
+                                            data-time-entry-edit-id="{{ $entry->id }}"
+                                            data-time-entry-edit-user-id="{{ $entry->user_id }}"
+                                            data-time-entry-edit-task-id="{{ $entry->task_id }}"
+                                            data-time-entry-edit-date="{{ $entry->date->toDateString() }}"
+                                            data-time-entry-edit-minutes="{{ \App\Support\TimeDisplay::hoursToMinutes($entry->hours) }}"
+                                            data-time-entry-edit-notes="{{ e($entry->notes ?? '') }}"
+                                        >
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    @endcan
+                                    @can('delete', $entry)
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-danger"
+                                            data-delete-confirm
+                                            data-delete-action="{{ route('time-entries.destroy', $entry) }}"
+                                            data-delete-title="Delete Logged Time"
+                                            data-delete-message="Delete this logged time entry for {{ $entry->task->title }}? This action cannot be undone."
+                                            data-delete-submit="Delete Time Entry"
+                                            aria-label="Delete time entry for {{ $entry->task->title }}"
+                                        >
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    @endcan
+                                </div>
                             </td>
                         </tr>
                     @empty
@@ -92,4 +123,12 @@
     </div>
 
     <div class="mt-3">{{ $entries->links('pagination::bootstrap-5') }}</div>
+
+    @include('time-entries._edit-modal', [
+        'selectedEntry' => $selectedEntry ?? null,
+        'showModal' => $showEditModal ?? false,
+        'tasks' => $tasks,
+        'users' => $users,
+        'returnTo' => $returnTo,
+    ])
 </x-app-layout>

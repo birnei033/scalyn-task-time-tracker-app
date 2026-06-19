@@ -15,13 +15,13 @@
         @csrf
 
         <div class="mb-3">
-            <x-input-label for="email" :value="__('Email')" />
+            <x-input-label for="email" :value="__('Email')" required />
             <x-text-input id="email" class="w-100 @error('email') is-invalid @enderror" type="email" name="email" :value="old('email')" required autofocus autocomplete="username" />
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>
 
         <div class="mb-3">
-            <x-input-label for="password" :value="__('Password')" />
+            <x-input-label for="password" :value="__('Password')" required />
             <x-text-input id="password" class="w-100 @error('password') is-invalid @enderror" type="password" name="password" required autocomplete="current-password" />
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>

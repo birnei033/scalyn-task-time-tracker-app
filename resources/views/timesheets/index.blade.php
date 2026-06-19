@@ -2,6 +2,11 @@
     <x-slot name="header">Timesheets</x-slot>
     @php
         $baseQuery = request()->except(['sort', 'direction']);
+        $editingEntryId = old('editing_entry', request('editing_entry'));
+        $showEditModal = old('modal_form') === 'time-entry-edit-modal' || request()->filled('editing_entry');
+        $selectedEntry = $editingEntryId
+            ? ($entries->firstWhere('id', (int) $editingEntryId) ?: \App\Models\TimeEntry::with(['user', 'task.client'])->find($editingEntryId))
+            : null;
         $sortUrl = fn (string $column) => route('timesheets.index', array_merge($baseQuery, [
             'sort' => $column,
             'direction' => $sort === $column && $direction === 'asc' ? 'desc' : 'asc',
@@ -22,20 +27,20 @@
             </div>
             <div class="col-lg-4 text-lg-end">
                 <div class="hero-metric ms-lg-auto">
-                    <div class="label mb-1">Total hours</div>
-                    <div class="value">{{ number_format((float) $totalHours, 2) }}</div>
+                    <div class="label mb-1">Total Time</div>
+                    <div class="value">{{ \App\Support\TimeDisplay::formatHours($totalHours) }}</div>
                 </div>
             </div>
         </div>
     </section>
 
-    <form class="surface-card p-4 mb-4" method="GET">
+    <form class="surface-card p-4 mb-4" method="GET" data-timesheet-filter-form>
         <input type="hidden" name="sort" value="{{ $sort }}">
         <input type="hidden" name="direction" value="{{ $direction }}">
         <div class="row g-3 align-items-end">
             <div class="col-lg-2">
                 <label class="form-label">View</label>
-                <select class="form-select" name="view">
+                <select class="form-select" name="view" data-timesheet-view-select>
                     <option value="daily" @selected($view === 'daily')>Daily</option>
                     <option value="weekly" @selected($view === 'weekly')>Weekly</option>
                     <option value="monthly" @selected($view === 'monthly')>Monthly</option>
@@ -43,11 +48,11 @@
             </div>
             <div class="col-lg-2">
                 <label class="form-label">From</label>
-                <input type="date" class="form-control" name="from" value="{{ $from }}">
+                <input type="date" class="form-control" name="from" value="{{ $from }}" data-timesheet-from-input>
             </div>
             <div class="col-lg-2">
                 <label class="form-label">To</label>
-                <input type="date" class="form-control" name="to" value="{{ $to }}">
+                <input type="date" class="form-control" name="to" value="{{ $to }}" data-timesheet-to-input>
             </div>
             <div class="col-lg-3">
                 <label class="form-label">Client</label>
@@ -69,10 +74,13 @@
                     </select>
                 </div>
             @endif
-            <div class="col-12">
+            <div class="col-12 d-flex flex-wrap gap-2">
                 <button class="btn btn-primary" data-loading-text="Applying...">
                     <i class="bi bi-funnel me-1"></i> Apply filters
                 </button>
+                <a class="btn btn-outline-secondary filter-action-btn filter-action-icon-btn" href="{{ route('timesheets.index') }}" aria-label="Reset filters">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </a>
             </div>
         </div>
     </form>
@@ -80,8 +88,8 @@
     <div class="row g-3 mb-4">
         <div class="col-md-4">
             <div class="metric-card">
-                <div class="metric-label">Total Hours</div>
-                <div class="metric-value mt-1">{{ number_format((float) $totalHours, 2) }}</div>
+                <div class="metric-label">Total Time</div>
+                <div class="metric-value mt-1">{{ \App\Support\TimeDisplay::formatHours($totalHours) }}</div>
             </div>
         </div>
         <div class="col-md-8">
@@ -94,7 +102,7 @@
                 </div>
                 <div>
                     @foreach ($dailyTotals as $date => $hours)
-                        <span class="badge badge-soft me-2 mb-2">{{ $date }}: {{ number_format((float) $hours, 2) }}</span>
+                        <span class="badge badge-soft me-2 mb-2">{{ $date }}: {{ \App\Support\TimeDisplay::formatHours($hours) }}</span>
                     @endforeach
                 </div>
             </div>
@@ -129,7 +137,10 @@
                             <a class="table-sort-link" href="{{ $sortUrl('notes') }}">Notes <i class="bi {{ $sortIcon('notes') }} table-sort-icon"></i></a>
                         </th>
                         <th scope="col" class="text-end" aria-sort="{{ $sort === 'hours' ? ($direction === 'asc' ? 'ascending' : 'descending') : 'none' }}">
-                            <a class="table-sort-link justify-content-end w-100" href="{{ $sortUrl('hours') }}">Hours <i class="bi {{ $sortIcon('hours') }} table-sort-icon"></i></a>
+                            <a class="table-sort-link justify-content-end w-100" href="{{ $sortUrl('hours') }}">Time <i class="bi {{ $sortIcon('hours') }} table-sort-icon"></i></a>
+                        </th>
+                        <th scope="col" class="text-end">
+                            <span class="visually-hidden">Actions</span>
                         </th>
                     </tr>
                 </thead>
@@ -141,11 +152,46 @@
                             <td>{{ $entry->task->client->name }}</td>
                             <td>{{ $entry->task->title }}</td>
                             <td>{{ \App\Support\RichText::excerpt($entry->notes) }}</td>
-                            <td class="text-end fw-semibold">{{ number_format((float) $entry->hours, 2) }}</td>
+                            <td class="text-end fw-semibold">{{ \App\Support\TimeDisplay::formatHours($entry->hours) }}</td>
+                            <td class="text-end">
+                                <div class="d-inline-flex gap-2">
+                                    @can('update', $entry)
+                                        <a
+                                            class="btn btn-sm btn-outline-secondary"
+                                            href="{{ route('timesheets.index', array_merge(request()->query(), ['editing_entry' => $entry->id])) }}"
+                                            aria-label="Edit time entry for {{ $entry->task->title }}"
+                                            data-time-entry-edit-trigger
+                                            data-time-entry-edit-action="{{ route('time-entries.update', $entry) }}"
+                                            data-time-entry-edit-id="{{ $entry->id }}"
+                                            data-time-entry-edit-user-id="{{ $entry->user_id }}"
+                                            data-time-entry-edit-task-id="{{ $entry->task_id }}"
+                                            data-time-entry-edit-date="{{ $entry->date->toDateString() }}"
+                                            data-time-entry-edit-minutes="{{ \App\Support\TimeDisplay::hoursToMinutes($entry->hours) }}"
+                                            data-time-entry-edit-notes="{{ e($entry->notes ?? '') }}"
+                                        >
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    @endcan
+                                    @can('delete', $entry)
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-danger"
+                                            data-delete-confirm
+                                            data-delete-action="{{ route('time-entries.destroy', $entry) }}"
+                                            data-delete-title="Delete Logged Time"
+                                            data-delete-message="Delete this logged time entry for {{ $entry->task->title }}? This action cannot be undone."
+                                            data-delete-submit="Delete Time Entry"
+                                            aria-label="Delete time entry for {{ $entry->task->title }}"
+                                        >
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    @endcan
+                                </div>
+                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6">
+                            <td colspan="7">
                                 <div class="table-empty">No entries for this timesheet.</div>
                             </td>
                         </tr>
@@ -154,4 +200,12 @@
             </table>
         </div>
     </div>
+
+    @include('time-entries._edit-modal', [
+        'selectedEntry' => $selectedEntry,
+        'showModal' => $showEditModal,
+        'tasks' => $tasks,
+        'users' => $users,
+        'returnTo' => route('timesheets.index', request()->except('editing_entry')),
+    ])
 </x-app-layout>

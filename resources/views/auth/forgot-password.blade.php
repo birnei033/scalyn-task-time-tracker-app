@@ -13,7 +13,7 @@
         @csrf
 
         <div class="mb-3">
-            <x-input-label for="email" :value="__('Email')" />
+            <x-input-label for="email" :value="__('Email')" required />
             <x-text-input id="email" class="w-100 @error('email') is-invalid @enderror" type="email" name="email" :value="old('email')" required autofocus />
             <x-input-error :messages="$errors->get('email')" class="mt-2" />
         </div>

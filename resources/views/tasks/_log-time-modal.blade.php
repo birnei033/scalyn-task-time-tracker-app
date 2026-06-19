@@ -2,6 +2,7 @@
 @php($showUserSelect = auth()->user()->canManageTeam())
 @php($statusValue = old('status', $selectedTask?->status ?: 'open'))
 @php($returnTo = old('return_to', request()->fullUrl() . (request()->routeIs('tasks.show') ? '#logged-time-pane' : '')))
+@php($minutesValue = old('minutes'))
 
 <x-item-modal-form
     name="task-log-time-modal"
@@ -43,7 +44,7 @@
 
         @if ($showUserSelect)
             <div class="col-lg-6">
-                <label class="form-label">User</label>
+                <label class="form-label">User <x-required-indicator /></label>
                 <select class="form-select @error('user_id') is-invalid @enderror" name="user_id" required data-task-log-time-user>
                     @foreach ($users as $user)
                         <option value="{{ $user->id }}" @selected(old('user_id', auth()->id()) == $user->id)>{{ $user->name }}</option>
@@ -56,7 +57,7 @@
         @endif
 
         <div class="col-lg-6">
-            <label class="form-label">Status</label>
+            <label class="form-label">Status <x-required-indicator /></label>
             <select class="form-select @error('status') is-invalid @enderror" name="status" required data-task-log-time-status>
                 @foreach (\App\Models\Task::statusOptions() as $value => $label)
                     <option value="{{ $value }}" @selected($statusValue === $value)>{{ $label }}</option>
@@ -66,7 +67,7 @@
         </div>
 
         <div class="col-lg-4">
-            <label class="form-label">Date</label>
+            <label class="form-label">Date <x-required-indicator /></label>
             <input
                 type="date"
                 class="form-control @error('date') is-invalid @enderror"
@@ -79,19 +80,19 @@
         </div>
 
         <div class="col-lg-4">
-            <label class="form-label">Hours</label>
+            <label class="form-label">Minutes <x-required-indicator /></label>
             <input
                 type="number"
-                min="0.25"
-                max="24"
-                step="0.25"
-                class="form-control @error('hours') is-invalid @enderror"
-                name="hours"
-                value="{{ old('hours') }}"
+                min="1"
+                max="1440"
+                step="1"
+                class="form-control @error('minutes') is-invalid @enderror"
+                name="minutes"
+                value="{{ $minutesValue }}"
                 required
-                data-task-log-time-hours
+                data-task-log-time-minutes
             >
-            @error('hours')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+            @error('minutes')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
         </div>
 
         <div class="col-12">

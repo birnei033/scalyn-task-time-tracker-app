@@ -645,6 +645,11 @@ a:hover {
     margin-bottom: .4rem;
 }
 
+.required-indicator {
+    font-weight: 800;
+    margin-left: .28rem;
+}
+
 .form-control,
 .form-select {
     min-height: 3rem;

@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Models\Task;
 use App\Models\TimeEntry;
 use App\Models\User;
+use App\Support\TimeDisplay;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
@@ -21,6 +23,10 @@ class TimesheetController extends Controller
             'to' => $to->toDateString(),
             'view' => $view,
             'clients' => Client::orderBy('name')->get(),
+            'tasks' => Task::with('client')
+                ->when(! $user->canManageTeam(), fn ($query) => $query->where('assigned_user_id', $user->id))
+                ->orderBy('title')
+                ->get(),
             'users' => $user->canManageTeam() ? User::orderBy('name')->get() : collect([$user]),
             'totalHours' => $entries->sum('hours'),
             'dailyTotals' => $entries->groupBy(fn ($entry) => $entry->date->toDateString())->map->sum('hours'),
@@ -34,7 +40,7 @@ class TimesheetController extends Controller
         [$entries] = $this->timesheetPayload($request);
         $handle = fopen('php://temp', 'r+');
 
-        fputcsv($handle, ['Date', 'User', 'Client', 'Task', 'Notes', 'Hours']);
+        fputcsv($handle, ['Date', 'User', 'Client', 'Task', 'Notes', 'Time']);
 
         foreach ($entries as $entry) {
             fputcsv($handle, [
@@ -43,7 +49,7 @@ class TimesheetController extends Controller
                 $entry->task->client->name,
                 $entry->task->title,
                 $entry->notes,
-                number_format((float) $entry->hours, 2, '.', ''),
+                TimeDisplay::formatHours($entry->hours),
             ]);
         }
 
@@ -62,7 +68,7 @@ class TimesheetController extends Controller
      */
     private function timesheetPayload(Request $request): array
     {
-        $view = $request->query('view', 'weekly');
+        $view = $request->query('view', 'monthly');
         $from = $this->resolveFromDate($request, $view);
         $to = $this->resolveToDate($request, $view, $from);
         [$sort, $direction] = $this->sortState($request->query('sort', 'date'), $request->query('direction', 'asc'));

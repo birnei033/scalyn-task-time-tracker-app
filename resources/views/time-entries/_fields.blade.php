@@ -1,11 +1,12 @@
 @php($timeEntry = $timeEntry ?? new \App\Models\TimeEntry)
 @php($contextTask = $contextTask ?? null)
 @php($showUserSelect = $showUserSelect ?? auth()->user()->canManageTeam())
+@php($minutesValue = old('minutes', $timeEntry->exists ? \App\Support\TimeDisplay::hoursToMinutes($timeEntry->hours) : ''))
 
 <div class="row g-3">
     @if ($showUserSelect)
         <div class="col-lg-6">
-            <label class="form-label">User</label>
+            <label class="form-label">User <x-required-indicator /></label>
             <select class="form-select @error('user_id') is-invalid @enderror" name="user_id" required>
                 @foreach ($users as $user)
                     <option value="{{ $user->id }}" @selected(old('user_id', $timeEntry->user_id ?: auth()->id()) == $user->id)>{{ $user->name }}</option>
@@ -18,7 +19,7 @@
     @endif
 
     <div class="{{ $contextTask ? 'col-12' : 'col-lg-6' }}">
-        <label class="form-label">Task</label>
+        <label class="form-label">Task <x-required-indicator /></label>
         @if ($contextTask)
             <input type="hidden" name="task_id" value="{{ old('task_id', $timeEntry->task_id ?: $contextTask->id) }}">
             <div class="surface-card p-3">
@@ -37,14 +38,14 @@
     </div>
 
     <div class="col-lg-3">
-        <label class="form-label">Date</label>
+        <label class="form-label">Date <x-required-indicator /></label>
         <input type="date" class="form-control @error('date') is-invalid @enderror" name="date" value="{{ old('date', $timeEntry->date?->toDateString() ?: now()->toDateString()) }}">
         @error('date')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
     <div class="col-lg-3">
-        <label class="form-label">Hours</label>
-        <input type="number" min="0.25" max="24" step="0.25" class="form-control @error('hours') is-invalid @enderror" name="hours" value="{{ old('hours', $timeEntry->hours) }}">
-        @error('hours')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+        <label class="form-label">Minutes <x-required-indicator /></label>
+        <input type="number" min="1" max="480" step="1" class="form-control @error('minutes') is-invalid @enderror" name="minutes" value="{{ $minutesValue }}">
+        @error('minutes')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
     </div>
     <div class="col-12">
         <x-rich-text-editor
@@ -54,6 +55,7 @@
             placeholder="Describe the work, updates, blockers, or context."
             :rows="5"
             id="time-entry-notes"
+            :required="false"
         />
     </div>
 </div>

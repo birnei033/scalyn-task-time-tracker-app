@@ -7,14 +7,14 @@
                 <div class="page-kicker mb-2">Overview</div>
                 <h2 class="page-title display-6 mb-3">Your workspace at a glance.</h2>
                 <p class="page-subtitle mb-0">
-                    Monitor hours, tasks, and client activity from a responsive dashboard built around Scalyn's blue theme.
+                    Monitor time, tasks, and client activity from a responsive dashboard built around Scalyn's blue theme.
                 </p>
             </div>
 
             <div class="col-lg-4">
                 <div class="hero-metric ms-lg-auto">
                     <div class="label mb-1">This week</div>
-                    <div class="value">{{ number_format((float) $weekHours, 2) }} hrs</div>
+                    <div class="value">{{ \App\Support\TimeDisplay::formatHours($weekHours) }}</div>
                     <div class="stat-mini mt-2">Tracked across the current workspace scope</div>
                 </div>
             </div>
@@ -23,8 +23,8 @@
 
     <section class="row g-3 mb-4">
         @foreach ([
-            ['label' => 'Total Hours', 'value' => number_format((float) $totalHours, 2), 'icon' => 'clock-history', 'note' => 'All logged work'],
-            ['label' => 'This Week', 'value' => number_format((float) $weekHours, 2), 'icon' => 'calendar-week', 'note' => 'Current period'],
+            ['label' => 'Monthly Time', 'value' => \App\Support\TimeDisplay::formatHours($totalHours), 'icon' => 'clock-history', 'note' => 'All logged work this month'],
+            ['label' => 'This Week', 'value' => \App\Support\TimeDisplay::formatHours($weekHours), 'icon' => 'calendar-week', 'note' => 'Current period'],
             ['label' => 'Active Clients', 'value' => $activeClients, 'icon' => 'building', 'note' => 'Open accounts'],
             ['label' => 'Open Tasks', 'value' => $openTasks, 'icon' => 'list-check', 'note' => 'Pending work'],
         ] as $metric)
@@ -79,7 +79,7 @@
                                 <th>Date</th>
                                 <th>Client / Task</th>
                                 <th>User</th>
-                                <th class="text-end">Hours</th>
+                                <th class="text-end">Time</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -91,7 +91,7 @@
                                         <div class="small text-muted">{{ $entry->task->title }}</div>
                                     </td>
                                     <td>{{ $entry->user->name }}</td>
-                                    <td class="text-end fw-semibold">{{ number_format((float) $entry->hours, 2) }}</td>
+                                    <td class="text-end fw-semibold">{{ \App\Support\TimeDisplay::formatHours($entry->hours) }}</td>
                                 </tr>
                             @empty
                                 <tr>
@@ -105,6 +105,11 @@
                         </tbody>
                     </table>
                 </div>
+                <div class="d-flex justify-content-end border-top px-3 px-lg-4 py-3">
+                    <a class="btn btn-outline-secondary" href="{{ route('time-entries.index') }}">
+                        Show all time entries
+                    </a>
+                </div>
             </div>
         </div>
 
@@ -113,7 +118,7 @@
                 <div class="d-flex align-items-center justify-content-between gap-3 mb-4">
                     <div>
                         <div class="section-kicker mb-1">Insights</div>
-                        <h3 class="h5 mb-0">Top clients by hours</h3>
+                        <h3 class="h5 mb-0">Top clients by time</h3>
                     </div>
                     <i class="bi bi-bar-chart-line stat-icon"></i>
                 </div>
@@ -125,7 +130,7 @@
                             <div class="d-flex align-items-center justify-content-between gap-3 mb-2">
                                 <div>
                                     <div class="fw-semibold">{{ $row->name }}</div>
-                                    <div class="small text-muted">{{ number_format((float) $row->hours, 2) }} hrs</div>
+                                    <div class="small text-muted">{{ \App\Support\TimeDisplay::formatHours($row->hours) }}</div>
                                 </div>
                                 <span class="badge badge-soft">{{ round(((float) $row->hours / $maxHours) * 100) }}%</span>
                             </div>

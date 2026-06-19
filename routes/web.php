@@ -41,6 +41,8 @@ Route::middleware('auth')->group(function () {
         Route::delete('tasks/{task}/comments/{comment}', [TaskCommentController::class, 'destroy'])->name('tasks.comments.destroy');
     });
     Route::patch('tasks/{task}/status', [TaskController::class, 'updateStatus'])->name('tasks.status.update');
+    Route::patch('tasks/{task}/priority', [TaskController::class, 'updatePriority'])->name('tasks.priority.update');
+    Route::post('tasks/bulk-status', [TaskController::class, 'bulkStatus'])->name('tasks.bulk-status.update');
     Route::post('tasks/log-time', [TaskController::class, 'logTime'])->name('tasks.log-time');
     Route::scopeBindings()->group(function () {
         Route::get('tasks/{task}/attachments/{attachment}', [TaskAttachmentController::class, 'show'])->name('tasks.attachments.show');

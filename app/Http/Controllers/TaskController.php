@@ -8,6 +8,7 @@ use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Models\User;
 use App\Support\RichText;
+use App\Support\TimeDisplay;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -24,10 +25,15 @@ class TaskController extends Controller
 
         $user = $request->user();
         $statusTask = null;
+        $priorityTask = null;
         $logTimeTask = null;
 
         if (session()->getOldInput('modal_form') === 'task-status-modal' && session()->getOldInput('task_id')) {
             $statusTask = Task::with('client')->find(session()->getOldInput('task_id'));
+        }
+
+        if (session()->getOldInput('modal_form') === 'task-priority-modal' && session()->getOldInput('task_id')) {
+            $priorityTask = Task::with('client')->find(session()->getOldInput('task_id'));
         }
 
         if (session()->getOldInput('modal_form') === 'task-log-time-modal' && session()->getOldInput('task_id')) {
@@ -41,8 +47,11 @@ class TaskController extends Controller
             ->when($request->input('search'), function ($query, $search) {
                 $query->where(function ($query) use ($search) {
                     $query->where('title', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
                         ->orWhereHas('client', fn ($clientQuery) => $clientQuery->where('name', 'like', "%{$search}%"))
-                        ->orWhereHas('assignedUser', fn ($assignedUserQuery) => $assignedUserQuery->where('name', 'like', "%{$search}%"));
+                        ->orWhereHas('assignedUser', fn ($assignedUserQuery) => $assignedUserQuery->where('name', 'like', "%{$search}%"))
+                        ->orWhereHas('comments', fn ($commentQuery) => $commentQuery->where('body', 'like', "%{$search}%"))
+                        ->orWhereHas('progressEntries', fn ($progressQuery) => $progressQuery->where('notes', 'like', "%{$search}%"));
                 });
             })
             ->when($request->input('status'), fn ($query, $status) => $query->where('status', $status))
@@ -52,7 +61,7 @@ class TaskController extends Controller
             ->paginate(12)
             ->withQueryString();
 
-        return view('tasks.index', array_merge(compact('tasks', 'statusTask', 'logTimeTask'), $this->formData(new Task)));
+        return view('tasks.index', array_merge(compact('tasks', 'statusTask', 'priorityTask', 'logTimeTask'), $this->formData(new Task)));
     }
 
     public function create()
@@ -95,7 +104,7 @@ class TaskController extends Controller
     {
         Gate::authorize('update', $task);
 
-        $validated = Validator::make($request->all(), $this->updateRules($request))->validate();
+        $validated = Validator::make($request->all(), $this->updateRules())->validate();
         $original = $task->only(['client_id', 'assigned_user_id', 'title', 'description', 'status', 'priority']);
 
         $taskData = [
@@ -146,6 +155,75 @@ class TaskController extends Controller
         return redirect()->route('tasks.index')->with('status', 'Task status updated.');
     }
 
+    public function updatePriority(Request $request, Task $task)
+    {
+        Gate::authorize('update', $task);
+
+        $validated = Validator::make($request->all(), $this->priorityRules())->validate();
+        $original = $task->only(['priority']);
+
+        DB::transaction(function () use ($task, $validated, $request, $original) {
+            $task->update([
+                'priority' => $validated['priority'],
+            ]);
+
+            $this->recordTaskChanges($task, $request->user(), $original, [
+                'priority' => $validated['priority'],
+            ]);
+        });
+
+        return redirect()->to($this->priorityReturnUrl($request, $task))->with('status', 'Task priority updated.');
+    }
+
+    public function bulkStatus(Request $request)
+    {
+        Gate::authorize('viewAny', Task::class);
+
+        $validated = Validator::make($request->all(), $this->bulkStatusRules(), $this->bulkStatusMessages())->validate();
+        $taskIds = array_values(array_unique(array_map('intval', $validated['task_ids'])));
+
+        $tasks = Task::with('client')
+            ->whereIn('id', $taskIds)
+            ->get()
+            ->keyBy('id');
+
+        if ($tasks->count() !== count($taskIds)) {
+            return back()
+                ->withErrors(['task_ids' => 'One or more selected tasks could not be found.'])
+                ->withInput();
+        }
+
+        if ($tasks->isEmpty()) {
+            return back()
+                ->withErrors(['task_ids' => 'Please select at least one task.'])
+                ->withInput();
+        }
+
+        $nonEditable = $tasks->filter(fn (Task $task) => ! Gate::allows('update', $task));
+
+        if ($nonEditable->isNotEmpty()) {
+            return back()
+                ->withErrors(['task_ids' => 'One or more selected tasks cannot be updated.'])
+                ->withInput();
+        }
+
+        DB::transaction(function () use ($tasks, $validated, $request) {
+            foreach ($tasks as $task) {
+                $original = $task->only(['status']);
+
+                $task->update([
+                    'status' => $validated['status'],
+                ]);
+
+                $this->recordTaskChanges($task, $request->user(), $original, [
+                    'status' => $validated['status'],
+                ]);
+            }
+        });
+
+        return redirect()->to($this->bulkStatusReturnUrl($request))->with('status', 'Task statuses updated.');
+    }
+
     public function logTime(Request $request)
     {
         $validated = Validator::make($request->all(), $this->logTimeRules($request))->validate();
@@ -170,7 +248,7 @@ class TaskController extends Controller
             $task->timeEntries()->create([
                 'user_id' => $userId,
                 'date' => $validated['date'],
-                'hours' => $validated['hours'],
+                'hours' => TimeDisplay::minutesToHours($validated['minutes']),
                 'notes' => RichText::clean($validated['notes'] ?? null),
             ]);
         });
@@ -214,21 +292,7 @@ class TaskController extends Controller
 
     private function validateTask(Request $request): array
     {
-        return $request->validate([
-            'client_id' => ['required', 'exists:clients,id'],
-            'assigned_user_id' => ['nullable', 'exists:users,id'],
-            'title' => ['required', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
-            'status' => ['required', 'in:'.implode(',', Task::statusValues())],
-            'priority' => ['required', 'in:low,medium,high'],
-            'attachments' => ['nullable', 'array', 'max:10'],
-            'attachments.*' => [
-                'file',
-                'max:20480',
-                'mimetypes:image/jpeg,image/png,image/gif,image/webp,image/bmp,image/tiff,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/rtf,application/vnd.oasis.opendocument.text,application/vnd.oasis.opendocument.spreadsheet,application/vnd.oasis.opendocument.presentation',
-            ],
-            'progress_notes' => ['nullable', 'string'],
-        ]);
+        return $request->validate($this->taskRules());
     }
 
     private function logTimeRules(Request $request): array
@@ -240,7 +304,7 @@ class TaskController extends Controller
             'return_to' => ['nullable', 'string'],
             'status' => ['required', 'in:'.implode(',', Task::statusValues())],
             'date' => ['required', 'date'],
-            'hours' => ['required', 'numeric', 'min:0.25', 'max:24'],
+            'minutes' => ['required', 'integer', 'min:1', 'max:1440'],
             'notes' => ['nullable', 'string'],
             'user_id' => [$canManageTeam ? 'required' : 'nullable', 'exists:users,id'],
         ];
@@ -252,6 +316,36 @@ class TaskController extends Controller
             'status' => ['required', 'in:'.implode(',', Task::statusValues())],
             'modal_form' => ['nullable', 'string'],
             'task_id' => ['nullable', 'exists:tasks,id'],
+        ];
+    }
+
+    private function priorityRules(): array
+    {
+        return [
+            'priority' => ['required', 'in:low,medium,high'],
+            'modal_form' => ['nullable', 'string'],
+            'task_id' => ['required', 'exists:tasks,id'],
+            'return_to' => ['nullable', 'string'],
+        ];
+    }
+
+    private function bulkStatusRules(): array
+    {
+        return [
+            'task_ids' => ['required', 'array', 'min:1'],
+            'task_ids.*' => ['integer', 'distinct', 'exists:tasks,id'],
+            'status' => ['required', 'in:'.implode(',', Task::statusValues())],
+            'return_to' => ['nullable', 'string'],
+        ];
+    }
+
+    private function bulkStatusMessages(): array
+    {
+        return [
+            'task_ids.required' => 'Please select at least one task.',
+            'task_ids.array' => 'Please select at least one task.',
+            'task_ids.min' => 'Please select at least one task.',
+            'status.required' => 'Please choose a status to apply.',
         ];
     }
 
@@ -387,6 +481,28 @@ class TaskController extends Controller
         return route('tasks.show', $task).'#logged-time-pane';
     }
 
+    private function priorityReturnUrl(Request $request, Task $task): string
+    {
+        foreach ([$request->input('return_to'), $request->headers->get('referer')] as $candidate) {
+            if ($this->isSafeInternalUrl($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return route('tasks.index');
+    }
+
+    private function bulkStatusReturnUrl(Request $request): string
+    {
+        foreach ([$request->input('return_to'), $request->headers->get('referer')] as $candidate) {
+            if ($this->isSafeInternalUrl($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return route('tasks.index');
+    }
+
     private function isSafeInternalUrl(?string $candidate): bool
     {
         if (! is_string($candidate) || $candidate === '') {
@@ -403,22 +519,35 @@ class TaskController extends Controller
             && $parts['host'] === request()->getHost();
     }
 
-    private function updateRules(Request $request): array
+    private function updateRules(): array
     {
-        $canManageTeam = $request->user()->canManageTeam();
-
-        return [
-            'client_id' => [$canManageTeam ? 'required' : 'nullable', 'exists:clients,id'],
-            'assigned_user_id' => ['nullable', 'exists:users,id'],
-            'title' => [$canManageTeam ? 'required' : 'nullable', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
+        return array_merge($this->taskRules(), [
             'status' => ['required', 'in:'.implode(',', Task::statusValues())],
-            'priority' => [$canManageTeam ? 'required' : 'nullable', 'in:low,medium,high'],
             'user_id' => ['nullable', 'exists:users,id'],
             'date' => ['nullable', 'date'],
             'hours' => ['nullable', 'numeric', 'min:0.25', 'max:24'],
             'notes' => ['nullable', 'string'],
             'progress_notes' => ['nullable', 'string'],
+        ]);
+    }
+
+    private function taskRules(): array
+    {
+        return [
+            'client_id' => ['required', 'exists:clients,id'],
+            'assigned_user_id' => ['required', 'exists:users,id'],
+            'title' => ['required', 'string', 'max:255'],
+            'description' => [
+                'required',
+                'string',
+                function ($attribute, $value, $fail) {
+                    if (RichText::clean($value) === null) {
+                        $fail('The description field is required.');
+                    }
+                },
+            ],
+            'status' => ['required', 'in:'.implode(',', Task::statusValues())],
+            'priority' => ['required', 'in:low,medium,high'],
             'attachments' => ['nullable', 'array', 'max:10'],
             'attachments.*' => [
                 'file',

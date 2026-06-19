@@ -14,16 +14,24 @@
     </section>
 
     <div class="surface-card p-4 mb-4">
-        <form class="row g-3 align-items-end" method="GET">
-            <div class="col-lg-3">
+        <form class="row g-3 align-items-end" method="GET" data-relative-date-range-form>
+            <div class="col-lg-2">
+                <label class="form-label">View</label>
+                <select class="form-select" name="view" data-relative-date-range-view-select>
+                    <option value="daily" @selected($view === 'daily')>Daily</option>
+                    <option value="weekly" @selected($view === 'weekly')>Weekly</option>
+                    <option value="monthly" @selected($view === 'monthly')>Monthly</option>
+                </select>
+            </div>
+            <div class="col-lg-2">
                 <label class="form-label">From</label>
-                <input type="date" class="form-control" name="from" value="{{ $from }}">
+                <input type="date" class="form-control" name="from" value="{{ $from }}" data-relative-date-range-from-input>
             </div>
-            <div class="col-lg-3">
+            <div class="col-lg-2">
                 <label class="form-label">To</label>
-                <input type="date" class="form-control" name="to" value="{{ $to }}">
+                <input type="date" class="form-control" name="to" value="{{ $to }}" data-relative-date-range-to-input>
             </div>
-            <div class="col-lg-3">
+            <div class="col-lg-2">
                 <label class="form-label">Client</label>
                 <select class="form-select" name="client_id">
                     <option value="">All clients</option>
@@ -32,7 +40,7 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-lg-3">
+            <div class="col-lg-2">
                 <label class="form-label">User</label>
                 <select class="form-select" name="user_id">
                     <option value="">All users</option>
@@ -52,12 +60,12 @@
 
     <div class="surface-card reports-total-card p-4 mb-4">
         <div class="metric-label">Filtered Total</div>
-        <div class="metric-value mt-1">{{ number_format((float) $totalHours, 2) }} hrs</div>
-        <div class="metric-copy mt-2">Total hours within the selected range and filters.</div>
+        <div class="metric-value mt-1">{{ \App\Support\TimeDisplay::formatHours($totalHours) }}</div>
+        <div class="metric-copy mt-2">Total logged time within the selected range and filters.</div>
     </div>
 
     <div class="row g-4">
-        @foreach ([['key' => 'clientHours', 'title' => 'Hours per Client', 'rows' => $clientHours, 'name' => 'name', 'exportLabel' => 'Export client hours CSV'], ['key' => 'taskHours', 'title' => 'Hours per Task', 'rows' => $taskHours, 'name' => 'title', 'exportLabel' => 'Export task hours CSV'], ['key' => 'userHours', 'title' => 'Hours per Employee', 'rows' => $userHours, 'name' => 'name', 'exportLabel' => 'Export employee hours CSV']] as $report)
+        @foreach ([['key' => 'clientHours', 'title' => 'Time per Client', 'rows' => $clientHours, 'name' => 'name', 'exportLabel' => 'Export client time CSV'], ['key' => 'taskHours', 'title' => 'Time per Task', 'rows' => $taskHours, 'name' => 'title', 'exportLabel' => 'Export task time CSV'], ['key' => 'userHours', 'title' => 'Time per Employee', 'rows' => $userHours, 'name' => 'name', 'exportLabel' => 'Export employee time CSV']] as $report)
             <div class="col-lg-4">
                 <div class="table-panel h-100">
                     <div class="table-panel-header">
@@ -74,14 +82,14 @@
                             <thead>
                                 <tr>
                                     <th>{{ $report['name'] === 'title' ? 'Task' : 'Name' }}</th>
-                                    <th class="text-end">Hours</th>
+                                    <th class="text-end">Time</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse ($report['rows'] as $row)
                                     <tr>
                                         <td>{{ $row->{$report['name']} }}</td>
-                                        <td class="text-end fw-semibold">{{ number_format((float) $row->hours, 2) }}</td>
+                                        <td class="text-end fw-semibold">{{ \App\Support\TimeDisplay::formatHours($row->hours) }}</td>
                                     </tr>
                                 @empty
                                     <tr>

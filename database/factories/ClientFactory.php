@@ -23,6 +23,7 @@ class ClientFactory extends Factory
             'email' => fake()->companyEmail(),
             'company' => fake()->company(),
             'status' => 'active',
+            'budget_per_month' => null,
             'notes' => fake()->sentence(),
         ];
     }

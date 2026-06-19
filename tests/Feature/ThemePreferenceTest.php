@@ -10,30 +10,29 @@ class ThemePreferenceTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_guest_pages_render_the_theme_toggle(): void
+    public function test_guest_pages_render_light_theme_without_toggle(): void
     {
         $response = $this->get('/');
 
         $response->assertOk();
-        $response->assertSee('data-theme-toggle', false);
+        $response->assertSee('const resolvedTheme = "light";', false);
+        $response->assertDontSee('data-theme-toggle', false);
     }
 
-    public function test_authenticated_pages_render_the_theme_toggle_and_saved_theme(): void
+    public function test_authenticated_pages_render_light_theme_without_toggle(): void
     {
-        $user = User::factory()->create([
-            'theme_preference' => 'dark',
-        ]);
+        $user = User::factory()->create();
 
         $response = $this
             ->actingAs($user)
             ->get('/dashboard');
 
         $response->assertOk();
-        $response->assertSee('data-theme-toggle', false);
-        $response->assertSee('data-theme-preference="dark"', false);
+        $response->assertSee('const resolvedTheme = "light";', false);
+        $response->assertDontSee('data-theme-toggle', false);
     }
 
-    public function test_profile_theme_preference_is_persisted(): void
+    public function test_profile_updates_ignore_theme_preference(): void
     {
         $user = User::factory()->create();
 
@@ -51,10 +50,10 @@ class ThemePreferenceTest extends TestCase
 
         $user->refresh();
 
-        $this->assertSame('dark', $user->theme_preference);
+        $this->assertSame('light', $user->theme_preference);
     }
 
-    public function test_profile_theme_preference_can_be_reset_to_system(): void
+    public function test_profile_updates_without_theme_preference(): void
     {
         $user = User::factory()->create([
             'theme_preference' => 'light',
@@ -65,7 +64,6 @@ class ThemePreferenceTest extends TestCase
             ->patch('/profile', [
                 'name' => 'Test User',
                 'email' => 'test@example.com',
-                'theme_preference' => 'system',
             ]);
 
         $response
@@ -74,6 +72,6 @@ class ThemePreferenceTest extends TestCase
 
         $user->refresh();
 
-        $this->assertNull($user->theme_preference);
+        $this->assertSame('light', $user->theme_preference);
     }
 }

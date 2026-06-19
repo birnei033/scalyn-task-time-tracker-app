@@ -1,7 +1,11 @@
 <x-app-layout>
     <x-slot name="header">Tasks</x-slot>
+    @php($bulkSelectionEnabled = $tasks->getCollection()->contains(fn ($task) => auth()->user()->can('update', $task)))
     @php($showTaskStatusModal = old('modal_form') === 'task-status-modal')
+    @php($showTaskPriorityModal = old('modal_form') === 'task-priority-modal')
     @php($showTaskLogTimeModal = old('modal_form') === 'task-log-time-modal')
+    @php($bulkSelectedTaskIds = old('task_ids', []))
+    @php($bulkStatusValue = old('status'))
 
     <section class="page-hero p-4 p-lg-5 mb-4">
         <div class="row align-items-center g-4">
@@ -82,10 +86,70 @@
             <span class="badge badge-soft">{{ $tasks->total() }} total</span>
         </div>
 
+        @if ($bulkSelectionEnabled)
+            @php($bulkTaskIdsError = $errors->first('task_ids') ?: $errors->first('task_ids.0'))
+            <div class="border-top border-bottom bg-body-tertiary px-3 py-3 px-lg-4 py-lg-3" data-task-bulk-status-panel>
+                <form
+                    method="POST"
+                    action="{{ route('tasks.bulk-status.update') }}"
+                    class="d-flex flex-column flex-xl-row align-items-stretch align-items-xl-end gap-3 gap-xl-4"
+                    data-task-bulk-status-form
+                    id="task-bulk-status-form"
+                >
+                    @csrf
+                    <input type="hidden" name="return_to" value="{{ request()->fullUrl() }}">
+
+                    <div class="d-flex flex-column flex-sm-row flex-wrap gap-3 gap-xl-4 flex-grow-1">
+                        <div class="d-flex flex-column gap-1" style="min-width: 14rem;">
+                            <label class="form-label mb-0 small text-uppercase fw-semibold text-muted">Bulk status</label>
+                            <select class="form-select form-select-sm @error('status') is-invalid @enderror" name="status" data-task-bulk-status-select>
+                                <option value="">Choose a status</option>
+                                @foreach (\App\Models\Task::statusOptions() as $status => $label)
+                                    <option value="{{ $status }}" @selected($bulkStatusValue === $status)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('status')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
+                        </div>
+
+                        <div class="d-flex flex-column gap-1">
+                            <div class="small text-uppercase fw-semibold text-muted">Selected tasks</div>
+                            <div class="fw-semibold" data-task-bulk-status-count>0 selected</div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex flex-column align-items-start align-items-xl-end gap-2 ms-xl-auto">
+                        <button
+                            class="btn btn-primary btn-sm px-3"
+                            type="submit"
+                            data-task-bulk-status-apply
+                            data-loading-text="Applying status..."
+                            disabled
+                        >
+                            <i class="bi bi-check2-circle me-1"></i> Apply Status
+                        </button>
+
+                        @if ($bulkTaskIdsError)
+                            <div class="invalid-feedback d-block m-0">{{ $bulkTaskIdsError }}</div>
+                        @endif
+                    </div>
+                </form>
+            </div>
+        @endif
+
         <div class="table-responsive">
             <table class="table table-hover align-middle">
                 <thead>
                     <tr>
+                        @if ($bulkSelectionEnabled)
+                            <th class="text-center" style="width: 1%">
+                                <input
+                                    class="form-check-input"
+                                    type="checkbox"
+                                    aria-label="Select all tasks"
+                                    data-task-bulk-status-select-all
+                                >
+                            </th>
+                        @endif
                         <th>Task</th>
                         <th>Client</th>
                         <th>Assigned</th>
@@ -97,6 +161,24 @@
                 <tbody>
                     @forelse ($tasks as $task)
                         <tr>
+                            @if ($bulkSelectionEnabled)
+                                <td class="text-center">
+                                    @can('update', $task)
+                                        <input
+                                            class="form-check-input"
+                                            type="checkbox"
+                                            name="task_ids[]"
+                                            value="{{ $task->id }}"
+                                            aria-label="Select {{ $task->title }}"
+                                            data-task-bulk-status-checkbox
+                                            form="task-bulk-status-form"
+                                            @checked(in_array((string) $task->id, $bulkSelectedTaskIds, true))
+                                        >
+                                    @else
+                                        <span class="text-muted">—</span>
+                                    @endcan
+                                </td>
+                            @endif
                             <td>
                                 @can('view', $task)
                                     <a
@@ -132,7 +214,28 @@
                                     <span class="badge {{ $task->statusBadgeClass() }}">{{ $task->statusLabel() }}</span>
                                 @endcan
                             </td>
-                            <td><span class="badge {{ $task->priorityBadgeClass() }}">{{ $task->priorityLabel() }}</span></td>
+                            <td>
+                                @can('update', $task)
+                                    <button
+                                        type="button"
+                                        class="btn btn-link p-0 text-decoration-none align-baseline"
+                                        aria-label="Update priority for {{ $task->title }}"
+                                        data-task-priority-trigger
+                                        data-task-id="{{ $task->id }}"
+                                        data-task-title="{{ $task->title }}"
+                                        data-task-client="{{ $task->client->name }}"
+                                        data-task-priority="{{ $task->priority }}"
+                                        data-task-priority-label="{{ $task->priorityLabel() }}"
+                                        data-task-priority-class="{{ $task->priorityBadgeClass() }}"
+                                        data-task-priority-action="{{ route('tasks.priority.update', $task) }}"
+                                        data-task-return-to="{{ request()->fullUrl() }}"
+                                    >
+                                        <span class="badge {{ $task->priorityBadgeClass() }}">{{ $task->priorityLabel() }}</span>
+                                    </button>
+                                @else
+                                    <span class="badge {{ $task->priorityBadgeClass() }}">{{ $task->priorityLabel() }}</span>
+                                @endcan
+                            </td>
                             <td class="text-end">
                                 @can('view', $task)
                                     <a class="btn btn-sm btn-outline-primary" href="{{ route('tasks.show', $task) }}">
@@ -176,7 +279,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6">
+                            <td colspan="{{ 6 + ($bulkSelectionEnabled ? 1 : 0) }}">
                                 <div class="table-empty">No tasks found for the current filters.</div>
                             </td>
                         </tr>
@@ -189,6 +292,11 @@
     @include('tasks._status-modal', [
         'selectedTask' => $statusTask ?? null,
         'showModal' => $showTaskStatusModal,
+    ])
+
+    @include('tasks._priority-modal', [
+        'selectedTask' => $priorityTask ?? null,
+        'showModal' => $showTaskPriorityModal,
     ])
 
     @include('tasks._log-time-modal', [
