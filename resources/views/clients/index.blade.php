@@ -53,6 +53,7 @@
                         <th>Name</th>
                         <th>Company</th>
                         <th>Contact</th>
+                        <th>Monthly Budget</th>
                         <th>Status</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -67,6 +68,25 @@
                             <td>
                                 <div class="fw-semibold">{{ $client->contact_person ?: '-' }}</div>
                                 <div class="small text-muted">{{ $client->email ?: 'No email' }}</div>
+                            </td>
+                            <td>
+                                @if ($client->budget_per_month !== null)
+                                    @php
+                                        $budgetMinutes = (int) $client->budget_per_month;
+                                        $usedMinutes = \App\Support\TimeDisplay::hoursToMinutes($client->monthly_hours ?? 0);
+                                        $remainingMinutes = $budgetMinutes - $usedMinutes;
+                                    @endphp
+                                    <div class="fw-semibold">
+                                        {{ \App\Support\TimeDisplay::formatMinutes($budgetMinutes) }}
+                                        <span class="text-muted">/</span>
+                                        <span class="{{ $remainingMinutes < 0 ? 'text-danger' : 'text-muted' }}">
+                                            {{ \App\Support\TimeDisplay::formatMinutes(abs($remainingMinutes)) }}
+                                            {{ $remainingMinutes < 0 ? 'exceeding' : 'remaining' }}
+                                        </span>
+                                    </div>
+                                @else
+                                    <span class="text-muted">-</span>
+                                @endif
                             </td>
                             <td>
                                 <span class="badge badge-brand">Active</span>
@@ -94,7 +114,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5">
+                            <td colspan="6">
                                 <div class="table-empty">No active clients found for the current filters.</div>
                             </td>
                         </tr>

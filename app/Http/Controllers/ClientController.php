@@ -120,6 +120,10 @@ class ClientController extends Controller
 
     private function clientList(Builder $query)
     {
+        $now = now();
+        $startOfMonth = $now->copy()->startOfMonth();
+        $endOfMonth = $now->copy()->endOfMonth();
+
         return $query
             ->when(request('search'), fn ($query, $search) => $query->where(function ($query) use ($search) {
                 $query->where('name', 'like', "%{$search}%")
@@ -128,6 +132,12 @@ class ClientController extends Controller
                     ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('notes', 'like', "%{$search}%");
             }))
+            ->withSum([
+                'timeEntries as monthly_hours' => function (Builder $query) use ($startOfMonth, $endOfMonth) {
+                    $query->whereDate('date', '>=', $startOfMonth)
+                        ->whereDate('date', '<=', $endOfMonth);
+                },
+            ], 'hours')
             ->latest()
             ->paginate(12)
             ->withQueryString();
