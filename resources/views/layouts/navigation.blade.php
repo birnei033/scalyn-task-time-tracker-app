@@ -1,7 +1,16 @@
 @php
     $items = [
         ['route' => 'dashboard', 'icon' => 'speedometer2', 'label' => 'Dashboard'],
-        ['route' => 'clients.index', 'icon' => 'building', 'label' => 'Clients'],
+        [
+            'route' => 'clients.index',
+            'active' => 'clients.*',
+            'icon' => 'building',
+            'label' => 'Clients',
+            'children' => [
+                ['route' => 'clients.index', 'label' => 'Clients'],
+                ['route' => 'clients.archives', 'label' => 'Archives'],
+            ],
+        ],
         ['route' => 'tasks.index', 'icon' => 'list-check', 'label' => 'Tasks'],
         ['route' => 'time-entries.index', 'icon' => 'clock-history', 'label' => 'Time Entry'],
         ['route' => 'timesheets.index', 'icon' => 'calendar-week', 'label' => 'Timesheets'],
@@ -35,10 +44,26 @@
 
     <nav class="nav nav-pills flex-column gap-1">
         @foreach ($items as $item)
-            <a class="nav-link {{ request()->routeIs($item['route']) ? 'active' : '' }}" href="{{ route($item['route']) }}">
-                <i class="bi bi-{{ $item['icon'] }}"></i>
-                <span>{{ $item['label'] }}</span>
-            </a>
+            @php
+                $isActive = request()->routeIs($item['active'] ?? $item['route']);
+            @endphp
+
+            <div class="{{ ! empty($item['children']) ? 'sidebar-nav-group' : '' }}">
+                <a class="nav-link {{ $isActive ? 'active' : '' }}" href="{{ route($item['route']) }}">
+                    <i class="bi bi-{{ $item['icon'] }}"></i>
+                    <span>{{ $item['label'] }}</span>
+                </a>
+
+                @if (! empty($item['children']))
+                    <div class="sidebar-subnav" aria-label="{{ $item['label'] }} submenu">
+                        @foreach ($item['children'] as $child)
+                            <a class="sidebar-subnav-link {{ request()->routeIs($child['route']) ? 'active' : '' }}" href="{{ route($child['route']) }}">
+                                {{ $child['label'] }}
+                            </a>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
         @endforeach
 
         <a class="nav-link {{ request()->routeIs('profile.*') ? 'active' : '' }}" href="{{ route('profile.edit') }}">

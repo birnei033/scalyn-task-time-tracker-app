@@ -20,8 +20,6 @@
         </div>
     </section>
 
-    @include('clients._tabs', ['activeTab' => 'archives'])
-
     <div class="surface-card p-4 mb-4">
         <form class="row g-3 align-items-end" method="GET">
             <div class="col-lg-9">

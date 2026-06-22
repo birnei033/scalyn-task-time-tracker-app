@@ -122,6 +122,37 @@ a:hover {
     transform: translateX(2px);
 }
 
+.sidebar-nav-group {
+    display: grid;
+    gap: .35rem;
+}
+
+.sidebar-subnav {
+    display: grid;
+    gap: .2rem;
+    margin-left: 1.7rem;
+    padding-left: 1rem;
+    border-left: 1px solid rgba(219, 233, 246, .18);
+}
+
+.sidebar-subnav-link {
+    color: rgba(233, 241, 248, .72);
+    border-radius: .75rem;
+    display: block;
+    font-size: .9rem;
+    font-weight: 600;
+    padding: .5rem .75rem;
+    text-decoration: none;
+    transition: background-color .18s ease, color .18s ease, transform .18s ease;
+}
+
+.sidebar-subnav-link:hover,
+.sidebar-subnav-link.active {
+    color: #fff;
+    background: rgba(255, 255, 255, .09);
+    transform: translateX(2px);
+}
+
 .sidebar-brand {
     display: flex;
     align-items: center;
