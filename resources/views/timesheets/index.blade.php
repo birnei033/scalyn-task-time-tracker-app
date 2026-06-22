@@ -96,9 +96,6 @@
             <div class="surface-card p-4">
                 <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
                     <div class="metric-label mb-0">Daily Totals</div>
-                    <a class="stat-icon" href="{{ route('timesheets.export', request()->query()) }}" aria-label="Export filtered timesheets CSV" title="Export filtered timesheets CSV">
-                        <i class="bi bi-download"></i>
-                    </a>
                 </div>
                 <div>
                     @foreach ($dailyTotals as $date => $hours)
@@ -198,6 +195,12 @@
                     @endforelse
                 </tbody>
             </table>
+        </div>
+        <div class="table-panel-footer">
+            <a class="table-panel-footer-action" href="{{ route('timesheets.export', request()->query()) }}" aria-label="Export filtered timesheets CSV" title="Export filtered timesheets CSV">
+                <span>Export</span>
+                <i class="bi bi-download"></i>
+            </a>
         </div>
     </div>
 

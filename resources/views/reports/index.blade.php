@@ -73,7 +73,8 @@
                             <div class="table-panel-eyebrow mb-1">Breakdown</div>
                             <h3 class="table-panel-title mb-0">{{ $report['title'] }}</h3>
                         </div>
-                        <a class="stat-icon" href="{{ route('reports.export', array_merge(request()->query(), ['report' => $report['key']])) }}" aria-label="{{ $report['exportLabel'] }}" title="{{ $report['exportLabel'] }}">
+                        <a class="stat-icon stat-icon-labeled" href="{{ route('reports.export', array_merge(request()->query(), ['report' => $report['key']])) }}" aria-label="{{ $report['exportLabel'] }}" title="{{ $report['exportLabel'] }}">
+                            <span>Export</span>
                             <i class="bi bi-download"></i>
                         </a>
                     </div>

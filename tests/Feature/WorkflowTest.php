@@ -1699,6 +1699,7 @@ class WorkflowTest extends TestCase
             ->assertSee('report=clientHours', false)
             ->assertSee('report=taskHours', false)
             ->assertSee('report=userHours', false)
+            ->assertSeeInOrder(['Export', 'bi bi-download'])
             ->assertSee('from=2026-06-01', false)
             ->assertSee('to=2026-06-30', false);
     }
@@ -1837,6 +1838,17 @@ class WorkflowTest extends TestCase
             'direction' => 'desc',
         ]))
             ->assertOk()
+            ->assertDontSee('class="stat-icon" href="'.route('timesheets.export', [
+                'view' => 'weekly',
+                'from' => '2026-06-08',
+                'to' => '2026-06-14',
+                'client_id' => $client->id,
+                'user_id' => $manager->id,
+                'sort' => 'hours',
+                'direction' => 'desc',
+            ]).'"', false)
+            ->assertSee('table-panel-footer-action', false)
+            ->assertSee('Export', false)
             ->assertSee(route('timesheets.export', [
                 'view' => 'weekly',
                 'from' => '2026-06-08',
