@@ -47,6 +47,9 @@ Route::middleware('auth')->group(function () {
     Route::scopeBindings()->group(function () {
         Route::get('tasks/{task}/attachments/{attachment}', [TaskAttachmentController::class, 'show'])->name('tasks.attachments.show');
         Route::get('tasks/{task}/attachments/{attachment}/download', [TaskAttachmentController::class, 'download'])->name('tasks.attachments.download');
+        Route::delete('tasks/{task}/attachments/{attachment}', [TaskAttachmentController::class, 'destroy'])->name('tasks.attachments.destroy');
+        Route::post('tasks/{task}/attachments/{attachment}/replace', [TaskAttachmentController::class, 'replace'])->name('tasks.attachments.replace');
+        Route::post('tasks/{task}/attachments/{attachment}/versions/{version}/restore', [TaskAttachmentController::class, 'restore'])->name('tasks.attachments.versions.restore');
     });
     Route::resource('time-entries', TimeEntryController::class);
     Route::get('timesheets', [TimesheetController::class, 'index'])->name('timesheets.index');

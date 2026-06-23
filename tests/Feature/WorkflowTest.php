@@ -4,14 +4,18 @@ namespace Tests\Feature;
 
 use App\Models\Client;
 use App\Models\Task;
+use App\Models\TaskAttachment;
+use App\Models\TaskAttachmentVersion;
 use App\Models\TaskComment;
 use App\Models\TaskProgressEntry;
 use App\Models\TimeEntry;
 use App\Models\User;
 use App\Support\TimeDisplay;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class WorkflowTest extends TestCase
@@ -1445,6 +1449,251 @@ class WorkflowTest extends TestCase
             ->assertSessionHasErrors('description');
     }
 
+    public function test_managers_can_replace_task_attachments_and_view_version_history(): void
+    {
+        Storage::fake('local');
+
+        $manager = User::factory()->create(['role' => 'manager']);
+        $task = $this->createTaskWithAttachment($manager, 'spec-sheet.pdf', 'application/pdf');
+        $attachment = $task->attachments()->firstOrFail();
+        $originalPath = $attachment->path;
+
+        $replaceResponse = $this->actingAs($manager)->post(route('tasks.attachments.replace', [$task, $attachment]), [
+            'attachment' => UploadedFile::fake()->create('spec-sheet-v2.pdf', 150, 'application/pdf'),
+            'return_to' => route('tasks.show', $task),
+            'modal_form' => 'attachment-replace-modal-'.$attachment->id,
+        ]);
+
+        $replaceResponse->assertRedirect(route('tasks.show', $task));
+
+        $attachment->refresh();
+
+        $this->assertSame('spec-sheet-v2.pdf', $attachment->original_name);
+        $this->assertDatabaseHas('task_attachment_versions', [
+            'task_attachment_id' => $attachment->id,
+            'action' => 'created',
+            'original_name' => 'spec-sheet.pdf',
+        ]);
+        $this->assertDatabaseHas('task_attachment_versions', [
+            'task_attachment_id' => $attachment->id,
+            'action' => 'replaced',
+            'original_name' => 'spec-sheet.pdf',
+        ]);
+        $this->assertCount(2, $attachment->versions);
+        Storage::disk('local')->assertMissing($originalPath);
+        Storage::disk('local')->assertExists($attachment->path);
+
+        $this->actingAs($manager)->get(route('tasks.show', $task))
+            ->assertOk()
+            ->assertSee('data-attachment-view-trigger', false)
+            ->assertSee('id="attachment-preview-modal"', false)
+            ->assertSee('data-swal-open="attachment-replace-modal-'.$attachment->id.'"', false)
+            ->assertSee('data-swal-open="attachment-history-modal-'.$attachment->id.'"', false)
+            ->assertSee('spec-sheet-v2.pdf');
+
+        $this->actingAs($manager)->get(route('tasks.edit', $task))
+            ->assertOk()
+            ->assertSee('data-attachment-view-trigger', false)
+            ->assertSee('id="attachment-preview-modal"', false);
+    }
+
+    public function test_managers_can_restore_previous_attachment_versions(): void
+    {
+        Storage::fake('local');
+
+        $manager = User::factory()->create(['role' => 'manager']);
+        $task = $this->createTaskWithAttachment($manager, 'contract.pdf', 'application/pdf');
+        $attachment = $task->attachments()->firstOrFail();
+
+        $this->actingAs($manager)->post(route('tasks.attachments.replace', [$task, $attachment]), [
+            'attachment' => UploadedFile::fake()->create('contract-v2.pdf', 175, 'application/pdf'),
+            'return_to' => route('tasks.show', $task),
+            'modal_form' => 'attachment-replace-modal-'.$attachment->id,
+        ])->assertRedirect(route('tasks.show', $task));
+
+        $version = $attachment->fresh()->versions()->firstOrFail();
+
+        $this->actingAs($manager)->delete(route('tasks.attachments.destroy', [$task, $attachment]), [
+            'return_to' => route('tasks.show', $task),
+        ])->assertRedirect(route('tasks.show', $task));
+
+        $this->assertSoftDeleted('task_attachments', [
+            'id' => $attachment->id,
+        ]);
+
+        $this->actingAs($manager)->post(route('tasks.attachments.versions.restore', [$task, $attachment, $version]), [
+            'return_to' => route('tasks.show', $task),
+        ])->assertRedirect(route('tasks.show', $task));
+
+        $attachment->refresh();
+
+        $this->assertSame('contract.pdf', $attachment->original_name);
+        $this->assertFalse($attachment->trashed());
+        $this->assertDatabaseHas('task_attachment_versions', [
+            'task_attachment_id' => $attachment->id,
+            'action' => 'deleted',
+            'original_name' => 'contract-v2.pdf',
+        ]);
+        Storage::disk('local')->assertExists($attachment->path);
+    }
+
+    public function test_managers_can_soft_delete_task_attachments(): void
+    {
+        Storage::fake('local');
+
+        $manager = User::factory()->create(['role' => 'manager']);
+        $task = $this->createTaskWithAttachment($manager, 'brief.pdf', 'application/pdf');
+        $attachment = $task->attachments()->firstOrFail();
+        $currentPath = $attachment->path;
+
+        $this->actingAs($manager)->delete(route('tasks.attachments.destroy', [$task, $attachment]), [
+            'return_to' => route('tasks.show', $task),
+        ])->assertRedirect(route('tasks.show', $task));
+
+        $this->assertSoftDeleted('task_attachments', [
+            'id' => $attachment->id,
+        ]);
+        $this->assertDatabaseHas('task_attachment_versions', [
+            'task_attachment_id' => $attachment->id,
+            'action' => 'deleted',
+            'original_name' => 'brief.pdf',
+        ]);
+        Storage::disk('local')->assertMissing($currentPath);
+    }
+
+    public function test_non_managers_cannot_manage_task_attachments(): void
+    {
+        $member = User::factory()->create(['role' => 'member']);
+        $task = Task::factory()->create([
+            'assigned_user_id' => $member->id,
+            'title' => 'Member task',
+        ]);
+        $attachment = TaskAttachment::factory()->create([
+            'task_id' => $task->id,
+            'user_id' => $member->id,
+            'original_name' => 'member-note.pdf',
+            'mime_type' => 'application/pdf',
+            'path' => 'task-attachments/'.$task->id.'/member-note.pdf',
+        ]);
+        $version = TaskAttachmentVersion::factory()->create([
+            'task_attachment_id' => $attachment->id,
+            'original_name' => 'member-note-v1.pdf',
+        ]);
+
+        $this->actingAs($member)->get(route('tasks.show', $task))
+            ->assertOk()
+            ->assertDontSee('attachment-replace-modal-'.$attachment->id, false)
+            ->assertDontSee('attachment-history-modal-'.$attachment->id, false)
+            ->assertDontSee('data-delete-action="'.route('tasks.attachments.destroy', [$task, $attachment]).'"', false);
+
+        $this->actingAs($member)
+            ->post(route('tasks.attachments.replace', [$task, $attachment]), [
+                'attachment' => UploadedFile::fake()->create('member-note-v2.pdf', 25, 'application/pdf'),
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($member)
+            ->delete(route('tasks.attachments.destroy', [$task, $attachment]))
+            ->assertForbidden();
+
+        $this->actingAs($member)
+            ->post(route('tasks.attachments.versions.restore', [$task, $attachment, $version]))
+            ->assertForbidden();
+    }
+
+    public function test_task_attachment_upload_validation_rejects_invalid_mime_and_size(): void
+    {
+        Storage::fake('local');
+
+        $manager = User::factory()->create(['role' => 'manager']);
+        $task = $this->createTaskWithAttachment($manager, 'design.pdf', 'application/pdf');
+        $attachment = $task->attachments()->firstOrFail();
+
+        $this->actingAs($manager)
+            ->from(route('tasks.create'))
+            ->post(route('tasks.store'), [
+                'client_id' => Client::factory()->create()->id,
+                'assigned_user_id' => $manager->id,
+                'title' => 'Invalid mime task',
+                'description' => '<p>Task</p>',
+                'status' => 'open',
+                'priority' => 'medium',
+                'attachments' => [
+                    UploadedFile::fake()->create('malware.exe', 10, 'application/x-msdownload'),
+                ],
+            ])
+            ->assertRedirect(route('tasks.create'))
+            ->assertSessionHasErrors(['attachments.0']);
+
+        $this->actingAs($manager)
+            ->from(route('tasks.create'))
+            ->post(route('tasks.store'), [
+                'client_id' => Client::factory()->create()->id,
+                'assigned_user_id' => $manager->id,
+                'title' => 'Oversized attachment task',
+                'description' => '<p>Task</p>',
+                'status' => 'open',
+                'priority' => 'medium',
+                'attachments' => [
+                    UploadedFile::fake()->create('too-big.pdf', 25000, 'application/pdf'),
+                ],
+            ])
+            ->assertRedirect(route('tasks.create'))
+            ->assertSessionHasErrors(['attachments.0']);
+
+        $this->actingAs($manager)
+            ->from(route('tasks.show', $task))
+            ->post(route('tasks.attachments.replace', [$task, $attachment]), [
+                'attachment' => UploadedFile::fake()->create('malware.exe', 10, 'application/x-msdownload'),
+                'return_to' => route('tasks.show', $task),
+                'modal_form' => 'attachment-replace-modal-'.$attachment->id,
+            ])
+            ->assertRedirect(route('tasks.show', $task))
+            ->assertSessionHasErrors(['attachment']);
+
+        $this->actingAs($manager)
+            ->from(route('tasks.show', $task))
+            ->post(route('tasks.attachments.replace', [$task, $attachment]), [
+                'attachment' => UploadedFile::fake()->create('too-big.pdf', 25000, 'application/pdf'),
+                'return_to' => route('tasks.show', $task),
+                'modal_form' => 'attachment-replace-modal-'.$attachment->id,
+            ])
+            ->assertRedirect(route('tasks.show', $task))
+            ->assertSessionHasErrors(['attachment']);
+    }
+
+    public function test_task_delete_removes_attachment_and_version_files(): void
+    {
+        Storage::fake('local');
+
+        $manager = User::factory()->create(['role' => 'manager']);
+        $task = $this->createTaskWithAttachment($manager, 'cleanup.pdf', 'application/pdf');
+        $attachment = $task->attachments()->firstOrFail();
+
+        $this->actingAs($manager)->post(route('tasks.attachments.replace', [$task, $attachment]), [
+            'attachment' => UploadedFile::fake()->create('cleanup-v2.pdf', 120, 'application/pdf'),
+            'return_to' => route('tasks.show', $task),
+            'modal_form' => 'attachment-replace-modal-'.$attachment->id,
+        ])->assertRedirect(route('tasks.show', $task));
+
+        $attachment->refresh();
+        $filePaths = array_merge([$attachment->path], $attachment->versions()->pluck('path')->all());
+
+        $this->actingAs($manager)->delete(route('tasks.destroy', $task))
+            ->assertRedirect(route('tasks.index'));
+
+        foreach ($filePaths as $path) {
+            Storage::disk('local')->assertMissing($path);
+        }
+
+        $this->assertDatabaseMissing('task_attachments', [
+            'id' => $attachment->id,
+        ]);
+        $this->assertDatabaseMissing('task_attachment_versions', [
+            'task_attachment_id' => $attachment->id,
+        ]);
+    }
+
     public function test_task_search_matches_client_and_assignee_names(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
@@ -2222,6 +2471,28 @@ class WorkflowTest extends TestCase
         ]);
 
         return compact('manager', 'member', 'northwindClient', 'bluebirdClient', 'northwindTask', 'bluebirdTask');
+    }
+
+    private function createTaskWithAttachment(User $manager, string $fileName, string $mimeType): Task
+    {
+        $client = Client::factory()->create();
+        $assignee = User::factory()->create(['role' => 'member']);
+
+        $response = $this->actingAs($manager)->post(route('tasks.store'), [
+            'client_id' => $client->id,
+            'assigned_user_id' => $assignee->id,
+            'title' => 'Attachment lifecycle task '.$fileName,
+            'description' => '<p>Attachment lifecycle task.</p>',
+            'status' => 'open',
+            'priority' => 'medium',
+            'attachments' => [
+                UploadedFile::fake()->create($fileName, 120, $mimeType),
+            ],
+        ]);
+
+        $response->assertRedirect(route('tasks.index'));
+
+        return Task::where('title', 'Attachment lifecycle task '.$fileName)->firstOrFail();
     }
 
     private function createReportExportFixtures(): array

@@ -5,7 +5,7 @@ namespace App\Models;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
+use App\Support\TaskAttachmentService;
 use Illuminate\Support\Str;
 
 class Task extends Model
@@ -54,6 +54,11 @@ class Task extends Model
     public function attachments()
     {
         return $this->hasMany(TaskAttachment::class)->latest()->orderByDesc('id');
+    }
+
+    public function deletedAttachments()
+    {
+        return $this->hasMany(TaskAttachment::class)->onlyTrashed()->latest()->orderByDesc('id');
     }
 
     public function progressEntries()
@@ -110,12 +115,29 @@ class Task extends Model
     protected static function booted(): void
     {
         static::deleting(function (Task $task) {
-            $task->loadMissing('attachments');
+            $attachments = $task->attachments()
+                ->withTrashed()
+                ->with('versions')
+                ->get();
 
-            foreach ($task->attachments as $attachment) {
-                Storage::disk('local')->delete($attachment->path);
+            $attachmentService = app(TaskAttachmentService::class);
+
+            foreach ($attachments as $attachment) {
+                $attachmentService->deleteAllFiles($attachment);
             }
         });
+    }
+
+    public function resolveChildRouteBinding($childType, $value, $field)
+    {
+        if (str_contains(strtolower((string) $childType), 'attachment')) {
+            return TaskAttachment::withTrashed()
+                ->where('task_id', $this->getKey())
+                ->where($field ?: (new TaskAttachment)->getRouteKeyName(), $value)
+                ->firstOrFail();
+        }
+
+        return parent::resolveChildRouteBinding($childType, $value, $field);
     }
 
     private function formatLabel(?string $value): string

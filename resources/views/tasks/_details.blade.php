@@ -112,30 +112,29 @@
                     <div class="task-detail-section">
                         <h3 class="h5 mb-3">Attachments</h3>
                         @forelse ($task->attachments as $attachment)
-                            <div class="attachment-card mb-2">
-                                <div class="attachment-icon">
-                                    <i class="bi {{ $attachment->isImage() ? 'bi-image' : 'bi-paperclip' }}"></i>
-                                </div>
-                                <div class="attachment-meta">
-                                    <div class="attachment-title">{{ $attachment->original_name }}</div>
-                                    <div class="attachment-subtitle">
-                                        {{ $attachment->displaySize() }} &middot; {{ $attachment->mime_type ?: 'Unknown type' }}
-                                        @if ($attachment->uploader)
-                                            &middot; Uploaded by {{ $attachment->uploader->name }}
-                                        @endif
-                                    </div>
-                                </div>
-                                <a class="btn btn-outline-primary btn-sm" href="{{ route('tasks.attachments.show', [$task, $attachment]) }}" target="_blank" rel="noopener">
-                                    View
-                                </a>
-                                <a class="btn btn-primary btn-sm" href="{{ route('tasks.attachments.download', [$task, $attachment]) }}">
-                                    Download
-                                </a>
-                            </div>
+                            @include('tasks._attachment-card', [
+                                'task' => $task,
+                                'attachment' => $attachment,
+                                'canManageAttachments' => auth()->user()->canManageTeam(),
+                            ])
                         @empty
                             <p class="muted-copy mb-0">No attachments uploaded yet.</p>
                         @endforelse
+
+                        @if (auth()->user()->canManageTeam() && $task->deletedAttachments->isNotEmpty())
+                            <div class="mt-4">
+                                <div class="section-kicker mb-2">Deleted attachments</div>
+                                @foreach ($task->deletedAttachments as $attachment)
+                                    @include('tasks._attachment-card', [
+                                        'task' => $task,
+                                        'attachment' => $attachment,
+                                        'canManageAttachments' => true,
+                                    ])
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
+                    @include('tasks._attachment-preview-modal')
                 </div>
 
                 <div

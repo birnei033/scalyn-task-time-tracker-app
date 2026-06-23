@@ -1437,6 +1437,52 @@ a:hover {
     font-size: .9rem;
 }
 
+.attachment-preview-stage {
+    min-height: 28rem;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    border: 1px solid var(--scalyn-surface-border);
+    border-radius: 1.1rem;
+    background: var(--scalyn-surface-soft);
+}
+
+.attachment-preview-image,
+.attachment-preview-frame {
+    width: 100%;
+    min-height: 26rem;
+    border: 0;
+    border-radius: .9rem;
+    background: #fff;
+}
+
+.attachment-preview-image {
+    object-fit: contain;
+}
+
+.attachment-preview-frame {
+    min-height: 31rem;
+}
+
+.attachment-preview-fallback {
+    max-width: 34rem;
+    text-align: center;
+    padding: 1.25rem 1rem;
+}
+
+.attachment-preview-fallback-icon {
+    width: 4rem;
+    height: 4rem;
+    border-radius: 1.1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1rem;
+    background: rgba(31, 79, 125, .1);
+    color: var(--scalyn-primary);
+    font-size: 1.6rem;
+}
+
 .task-detail-tabs .task-tabs {
     gap: .45rem;
     padding: .1rem;

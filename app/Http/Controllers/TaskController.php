@@ -5,20 +5,23 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\TaskActivityEntry;
 use App\Models\Task;
-use App\Models\TaskAttachment;
 use App\Models\User;
 use App\Support\RichText;
+use App\Support\TaskAttachmentService;
 use App\Support\TimeDisplay;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Schema;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
 class TaskController extends Controller
 {
+    public function __construct(private TaskAttachmentService $taskAttachmentService)
+    {
+    }
+
     public function index(Request $request)
     {
         Gate::authorize('viewAny', Task::class);
@@ -268,7 +271,7 @@ class TaskController extends Controller
     private function formData(Task $task): array
     {
         if ($task->exists) {
-            $task->loadMissing($this->detailRelations());
+            $task->loadMissing($this->detailRelations(request()->user()?->canManageTeam() ?? false));
         }
 
         return [
@@ -279,9 +282,22 @@ class TaskController extends Controller
         ];
     }
 
-    private function detailRelations(): array
+    private function detailRelations(bool $includeDeletedAttachments = false): array
     {
-        $relations = ['client', 'assignedUser', 'attachments.uploader', 'timeEntries.user', 'progressEntries.user', 'comments.user'];
+        $relations = [
+            'client',
+            'assignedUser',
+            'attachments.uploader',
+            'attachments.versions.actor',
+            'timeEntries.user',
+            'progressEntries.user',
+            'comments.user',
+        ];
+
+        if ($includeDeletedAttachments) {
+            $relations[] = 'deletedAttachments.uploader';
+            $relations[] = 'deletedAttachments.versions.actor';
+        }
 
         if ($this->hasTaskActivityTable()) {
             $relations[] = 'activityEntries.user';
@@ -372,24 +388,7 @@ class TaskController extends Controller
                 continue;
             }
 
-            $originalName = $file->getClientOriginalName();
-            $extension = strtolower($file->getClientOriginalExtension() ?: $file->guessExtension() ?: 'bin');
-            $storedName = Str::uuid()->toString().'.'.$extension;
-            $directory = 'task-attachments/'.$task->id;
-            $path = Storage::disk('local')->putFileAs($directory, $file, $storedName);
-
-            if (! $path) {
-                continue;
-            }
-
-            TaskAttachment::create([
-                'task_id' => $task->id,
-                'user_id' => $request->user()->id,
-                'path' => $path,
-                'original_name' => $originalName,
-                'mime_type' => $file->getClientMimeType() ?: $file->getMimeType(),
-                'size' => $file->getSize() ?: 0,
-            ]);
+            $this->taskAttachmentService->create($task, $file, $request->user());
         }
     }
 
@@ -533,7 +532,7 @@ class TaskController extends Controller
 
     private function taskRules(): array
     {
-        return [
+        return array_merge([
             'client_id' => ['required', 'exists:clients,id'],
             'assigned_user_id' => ['required', 'exists:users,id'],
             'title' => ['required', 'string', 'max:255'],
@@ -548,12 +547,6 @@ class TaskController extends Controller
             ],
             'status' => ['required', 'in:'.implode(',', Task::statusValues())],
             'priority' => ['required', 'in:low,medium,high'],
-            'attachments' => ['nullable', 'array', 'max:10'],
-            'attachments.*' => [
-                'file',
-                'max:20480',
-                'mimetypes:image/jpeg,image/png,image/gif,image/webp,image/bmp,image/tiff,application/pdf,text/plain,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/rtf,application/vnd.oasis.opendocument.text,application/vnd.oasis.opendocument.spreadsheet,application/vnd.oasis.opendocument.presentation',
-            ],
-        ];
+        ], TaskAttachmentService::taskAttachmentRules());
     }
 }

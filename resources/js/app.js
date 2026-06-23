@@ -688,6 +688,74 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    const attachmentPreviewSource = document.getElementById('attachment-preview-modal');
+
+    const openAttachmentPreviewPopup = (trigger) => {
+        openSwalFromSource(attachmentPreviewSource, {
+            beforeOpen: (content) => {
+                const title = content.querySelector('[data-attachment-preview-title]');
+                const size = content.querySelector('[data-attachment-preview-size]');
+                const mime = content.querySelector('[data-attachment-preview-mime]');
+                const uploader = content.querySelector('[data-attachment-preview-uploader]');
+                const image = content.querySelector('[data-attachment-preview-image]');
+                const frame = content.querySelector('[data-attachment-preview-frame]');
+                const fallback = content.querySelector('[data-attachment-preview-fallback]');
+                const download = content.querySelector('[data-attachment-preview-download]');
+                const viewUrl = trigger.getAttribute('data-attachment-preview-view-url') || '';
+                const downloadUrl = trigger.getAttribute('data-attachment-preview-download-url') || '';
+                const previewKind = trigger.getAttribute('data-attachment-preview-kind') || 'file';
+
+                clearValidationState(content);
+
+                if (title) {
+                    title.textContent = trigger.getAttribute('data-attachment-preview-title') || 'Attachment preview';
+                }
+
+                if (size) {
+                    size.textContent = trigger.getAttribute('data-attachment-preview-size') || '--';
+                }
+
+                if (mime) {
+                    mime.textContent = trigger.getAttribute('data-attachment-preview-mime') || '--';
+                }
+
+                if (uploader) {
+                    uploader.textContent = trigger.getAttribute('data-attachment-preview-uploader') || '--';
+                }
+
+                if (download) {
+                    download.setAttribute('href', downloadUrl);
+                }
+
+                image?.classList.add('d-none');
+                frame?.classList.add('d-none');
+                fallback?.classList.add('d-none');
+                image?.removeAttribute('src');
+                frame?.removeAttribute('src');
+
+                if (previewKind === 'image' && image) {
+                    image.setAttribute('src', viewUrl);
+                    image.classList.remove('d-none');
+                } else if (previewKind === 'pdf' && frame) {
+                    frame.setAttribute('src', viewUrl);
+                    frame.classList.remove('d-none');
+                } else if (fallback) {
+                    fallback.classList.remove('d-none');
+                }
+            },
+        });
+    };
+
+    document.querySelectorAll('[data-attachment-view-trigger]').forEach((trigger) => {
+        trigger.addEventListener('click', () => {
+            if (!attachmentPreviewSource) {
+                return;
+            }
+
+            openAttachmentPreviewPopup(trigger);
+        });
+    });
+
     const deleteSource = document.getElementById('delete-confirmation-modal');
     const deleteForm = deleteSource?.querySelector('#delete-confirmation-form');
     const deleteTitle = deleteSource?.querySelector('#delete-confirmation-title');
