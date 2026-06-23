@@ -6,27 +6,25 @@
 
 @php
 $maxWidth = [
-    'sm' => 'modal-sm',
-    'md' => '',
-    'lg' => 'modal-lg',
-    'xl' => 'modal-xl',
-    '2xl' => 'modal-xl',
+    'sm' => '26rem',
+    'md' => '32rem',
+    'lg' => '42rem',
+    'xl' => '52rem',
+    '2xl' => '60rem',
 ][$maxWidth];
 @endphp
 
 <div
     {{ $attributes->merge([
-        'class' => trim('modal fade'),
+        'class' => trim('d-none'),
         'id' => $name,
-        'tabindex' => '-1',
-        'aria-labelledby' => $name.'-label',
         'aria-hidden' => 'true',
     ]) }}
-    @if ($show) data-auto-open="true" @endif
+    data-swal-source="true"
+    data-swal-width="{{ $maxWidth }}"
+    @if ($show) data-swal-auto-open="true" @endif
 >
-    <div class="modal-dialog modal-dialog-scrollable {{ $maxWidth }}">
-        <div class="modal-content">
-            {{ $slot }}
-        </div>
+    <div class="swal-source-shell" style="display: none;">
+        {{ $slot }}
     </div>
 </div>

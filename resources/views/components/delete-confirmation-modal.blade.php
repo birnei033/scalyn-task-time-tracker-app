@@ -9,7 +9,7 @@
                 <div class="section-kicker mb-1">Confirm deletion</div>
                 <h2 class="modal-title fs-5 mb-0" id="delete-confirmation-title">Delete item</h2>
             </div>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <button type="button" class="btn-close" data-swal-close aria-label="Close"></button>
         </div>
 
         <div class="modal-body">
@@ -19,7 +19,7 @@
         </div>
 
         <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+            <button type="button" class="btn btn-outline-secondary" data-swal-close>
                 Cancel
             </button>
             <button type="submit" class="btn btn-danger" id="delete-confirmation-submit" data-loading-text="Deleting...">

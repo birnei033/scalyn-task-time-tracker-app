@@ -1,27 +1,15 @@
 <x-app-layout>
     <x-slot name="header">{{ $user->name }}</x-slot>
-
-    <section class="page-hero p-4 p-lg-5 mb-4">
-        <div class="row align-items-center g-4">
-            <div class="col-lg-8">
-                <div class="page-kicker mb-2">User profile</div>
-                <h2 class="page-title h1 mb-3">{{ $user->name }}</h2>
-                <p class="page-subtitle mb-0">
-                    Review role, team placement, and activity counts for this account.
-                </p>
-            </div>
-            <div class="col-lg-4 text-lg-end d-flex justify-content-lg-end gap-2 flex-wrap">
-                @can('update', $user)
-                    <a class="btn btn-primary" href="{{ route('users.edit', $user) }}">
-                        <i class="bi bi-pencil me-1"></i> Edit User
-                    </a>
-                @endcan
-                <a class="btn btn-outline-secondary" href="{{ route('users.index') }}">
-                    Back
-                </a>
-            </div>
-        </div>
-    </section>
+    <x-slot name="actions">
+        @can('update', $user)
+            <a class="btn btn-primary" href="{{ route('users.edit', $user) }}">
+                <i class="bi bi-pencil me-1"></i> Edit User
+            </a>
+        @endcan
+        <a class="btn btn-outline-secondary" href="{{ route('users.index') }}">
+            Back
+        </a>
+    </x-slot>
 
     <div class="row g-4">
         <div class="col-lg-4">

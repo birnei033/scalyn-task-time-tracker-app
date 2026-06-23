@@ -145,7 +145,9 @@
                     @forelse ($entries as $entry)
                         <tr>
                             <td>{{ $entry->date->format('M d, Y') }}</td>
-                            <td>{{ $entry->user->name }}</td>
+                            <td>
+                                <x-user-identity :name="$entry->user->name" seed="{{ $entry->user_id }}" />
+                            </td>
                             <td>{{ $entry->task->client->name }}</td>
                             <td>{{ $entry->task->title }}</td>
                             <td>{{ \App\Support\RichText::excerpt($entry->notes) }}</td>
@@ -154,7 +156,7 @@
                                 <div class="d-inline-flex gap-2">
                                     @can('update', $entry)
                                         <a
-                                            class="btn btn-sm btn-outline-secondary"
+                                            class="btn btn-outline-secondary table-action-icon-btn table-action-view"
                                             href="{{ route('timesheets.index', array_merge(request()->query(), ['editing_entry' => $entry->id])) }}"
                                             aria-label="Edit time entry for {{ $entry->task->title }}"
                                             data-time-entry-edit-trigger
@@ -172,7 +174,7 @@
                                     @can('delete', $entry)
                                         <button
                                             type="button"
-                                            class="btn btn-sm btn-outline-danger"
+                                            class="btn btn-outline-danger table-action-icon-btn table-action-delete"
                                             data-delete-confirm
                                             data-delete-action="{{ route('time-entries.destroy', $entry) }}"
                                             data-delete-title="Delete Logged Time"

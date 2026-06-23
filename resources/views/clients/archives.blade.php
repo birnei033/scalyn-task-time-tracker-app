@@ -1,24 +1,12 @@
 <x-app-layout>
     <x-slot name="header">Client Archives</x-slot>
-
-    <section class="page-hero p-4 p-lg-5 mb-4">
-        <div class="row align-items-center g-4">
-            <div class="col-lg-8">
-                <div class="page-kicker mb-2">Archived records</div>
-                <h2 class="page-title h1 mb-3">Review archived clients and remove them permanently.</h2>
-                <p class="page-subtitle mb-0">
-                    Keep inactive accounts separated from active work and clean them up when they are no longer needed.
-                </p>
-            </div>
-            <div class="col-lg-4 text-lg-end">
-                @can('create', App\Models\Client::class)
-                    <a href="{{ route('clients.create') }}" class="btn btn-primary btn-lg">
-                        <i class="bi bi-plus-lg me-1"></i> Add Client
-                    </a>
-                @endcan
-            </div>
-        </div>
-    </section>
+    <x-slot name="actions">
+        @can('create', App\Models\Client::class)
+            <a href="{{ route('clients.create') }}" class="btn btn-primary btn-lg">
+                <i class="bi bi-plus-lg me-1"></i> Add Client
+            </a>
+        @endcan
+    </x-slot>
 
     <div class="surface-card p-4 mb-4">
         <form class="row g-3 align-items-end" method="GET">
@@ -93,20 +81,21 @@
                             </td>
                             <td class="text-end">
                                 @can('view', $client)
-                                    <a class="btn btn-sm btn-outline-secondary" href="{{ route('clients.show', $client) }}">
+                                    <a class="btn btn-outline-secondary table-action-icon-btn table-action-view" href="{{ route('clients.show', $client) }}" aria-label="View {{ $client->name }}">
                                         <i class="bi bi-eye"></i>
                                     </a>
                                 @endcan
                                 @can('restore', $client)
                                     <button
                                         type="button"
-                                        class="btn btn-sm btn-success"
+                                        class="btn btn-outline-success table-action-icon-btn table-action-success"
                                         data-delete-confirm
                                         data-delete-action="{{ route('clients.restore', $client) }}"
                                         data-delete-title="Restore Client"
                                         data-delete-message="Are you sure you want to restore {{ $client->name }} to active clients?"
                                         data-delete-submit="Restore Client"
                                         data-delete-method="PATCH"
+                                        aria-label="Restore {{ $client->name }}"
                                     >
                                         <i class="bi bi-arrow-counterclockwise"></i>
                                     </button>
@@ -114,12 +103,13 @@
                                 @can('forceDelete', $client)
                                     <button
                                         type="button"
-                                        class="btn btn-sm btn-danger"
+                                        class="btn btn-outline-danger table-action-icon-btn table-action-delete"
                                         data-delete-confirm
                                         data-delete-action="{{ route('clients.force-delete', $client) }}"
                                         data-delete-title="Delete Archived Client"
                                         data-delete-message="Are you sure you want to permanently delete {{ $client->name }}? This action cannot be undone."
                                         data-delete-submit="Delete Permanently"
+                                        aria-label="Delete archived client {{ $client->name }}"
                                     >
                                         <i class="bi bi-trash"></i>
                                     </button>

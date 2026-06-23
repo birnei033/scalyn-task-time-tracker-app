@@ -1,10 +1,13 @@
 import './bootstrap';
 import * as bootstrap from 'bootstrap';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
 
 import Alpine from 'alpinejs';
 
 window.Alpine = Alpine;
 window.bootstrap = bootstrap;
+window.Swal = Swal;
 
 Alpine.start();
 
@@ -38,7 +41,10 @@ function setLoadingState(form) {
 
 function syncRichEditor(editor) {
     const targetId = editor.getAttribute('data-rich-editor-target');
-    const target = targetId ? document.getElementById(targetId) : null;
+    const container = editor.closest('[data-rich-editor]');
+    const target = targetId
+        ? container?.querySelector(`#${CSS.escape(targetId)}`) || document.getElementById(targetId)
+        : null;
 
     if (!target) {
         return;
@@ -153,9 +159,136 @@ function initializeRelativeDateRangeFilter(form) {
     viewSelect.addEventListener('change', syncDateRange);
 }
 
+const swalWidthMap = {
+    sm: '26rem',
+    md: '32rem',
+    lg: '42rem',
+    xl: '52rem',
+    '2xl': '60rem',
+};
+
+function getSwalWidth(source) {
+    const width = source?.dataset.swalWidth;
+
+    if (!width) {
+        return '42rem';
+    }
+
+    return swalWidthMap[width] || width;
+}
+
+function cloneSwalSource(source) {
+    const clone = source.cloneNode(true);
+
+    clone.classList.remove('d-none');
+    clone.removeAttribute('hidden');
+    clone.removeAttribute('aria-hidden');
+    clone.style.display = 'block';
+    clone.querySelectorAll('.swal-source-shell').forEach((shell) => {
+        shell.style.display = 'block';
+    });
+
+    return clone;
+}
+
+function bindPopupDismissButtons(root) {
+    root.querySelectorAll('[data-bs-dismiss="modal"], [data-swal-close]').forEach((button) => {
+        if (button.dataset.swalDismissBound === 'true') {
+            return;
+        }
+
+        button.dataset.swalDismissBound = 'true';
+        button.addEventListener('click', () => {
+            Swal.close();
+        });
+    });
+}
+
+function bindLoadingStateForRoot(root) {
+    root.querySelectorAll('form').forEach((form) => {
+        if (form.dataset.loadingBound === 'true') {
+            return;
+        }
+
+        form.dataset.loadingBound = 'true';
+        form.addEventListener('submit', () => {
+            setLoadingState(form);
+        });
+    });
+}
+
+function initializeRichEditorsForRoot(root) {
+    root.querySelectorAll('[data-rich-editor]').forEach((container) => {
+        if (container.dataset.richEditorBound === 'true') {
+            return;
+        }
+
+        container.dataset.richEditorBound = 'true';
+        initializeRichEditor(container);
+    });
+}
+
+function clearValidationState(root) {
+    root?.querySelectorAll('.is-invalid').forEach((element) => {
+        element.classList.remove('is-invalid');
+    });
+
+    root?.querySelectorAll('.invalid-feedback').forEach((element) => {
+        element.style.display = 'none';
+    });
+}
+
+function openSwalFromSource(source, { beforeOpen, didOpen, didClose } = {}) {
+    if (!source) {
+        return;
+    }
+
+    const content = cloneSwalSource(source);
+
+    if (typeof beforeOpen === 'function') {
+        beforeOpen(content);
+    }
+
+    Swal.fire({
+        html: content,
+        width: getSwalWidth(source),
+        backdrop: true,
+        allowOutsideClick: false,
+        allowEscapeKey: true,
+        showConfirmButton: false,
+        showCancelButton: false,
+        scrollbarPadding: false,
+        customClass: {
+            popup: 'app-swal-popup',
+            htmlContainer: 'app-swal-html',
+        },
+        didOpen: () => {
+            const popup = Swal.getPopup();
+
+            if (!popup) {
+                return;
+            }
+
+            bindPopupDismissButtons(popup);
+            bindLoadingStateForRoot(popup);
+            initializeRichEditorsForRoot(popup);
+            popup.querySelector('[autofocus], input, select, textarea, button')?.focus?.();
+
+            if (typeof didOpen === 'function') {
+                didOpen(popup);
+            }
+        },
+        didClose: () => {
+            if (typeof didClose === 'function') {
+                didClose();
+            }
+        },
+    });
+}
+
 window.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('[data-auto-open="true"]').forEach((element) => {
-        bootstrap.Modal.getOrCreateInstance(element).show();
+    document.querySelectorAll('[data-swal-auto-open="true"]').forEach((source) => {
+        openSwalFromSource(source);
     });
 
     if (window.location.hash) {
@@ -198,101 +331,66 @@ window.addEventListener('DOMContentLoaded', () => {
         initializeRelativeDateRangeFilter(form);
     });
 
-    const taskStatusModalElement = document.getElementById('task-status-modal');
-    const taskStatusModal = taskStatusModalElement ? bootstrap.Modal.getOrCreateInstance(taskStatusModalElement) : null;
-    const taskStatusForm = taskStatusModalElement?.querySelector('form');
-    const taskStatusTaskId = taskStatusModalElement?.querySelector('[data-task-status-task-id]');
-    const taskStatusTitle = taskStatusModalElement?.querySelector('[data-task-status-task-title]');
-    const taskStatusClient = taskStatusModalElement?.querySelector('[data-task-status-task-client]');
-    const taskStatusBadge = taskStatusModalElement?.querySelector('[data-task-status-task-badge]');
-    const taskStatusSelect = taskStatusModalElement?.querySelector('[data-task-status-select]');
+    const taskStatusSource = document.getElementById('task-status-modal');
+    const taskStatusTitle = taskStatusSource?.querySelector('[data-task-status-task-title]');
+    const taskStatusClient = taskStatusSource?.querySelector('[data-task-status-task-client]');
+    const taskStatusBadge = taskStatusSource?.querySelector('[data-task-status-task-badge]');
+    const taskStatusSelect = taskStatusSource?.querySelector('[data-task-status-select]');
+    const taskStatusTaskId = taskStatusSource?.querySelector('[data-task-status-task-id]');
     const taskStatusDefaultTitle = taskStatusTitle?.textContent || 'Choose a task status from the table.';
-    const taskStatusDefaultClient = taskStatusClient?.textContent || 'The modal will populate from the row you choose.';
+    const taskStatusDefaultClient = taskStatusClient?.textContent || 'The popup will populate from the row you choose.';
     const taskStatusDefaultBadgeText = taskStatusBadge?.textContent || 'Not selected';
-    const taskStatusDefaultBadgeClass = taskStatusBadge?.className || 'badge badge-soft';
     const taskStatusDefaultValue = taskStatusSelect?.value || 'open';
 
-    const clearTaskStatusValidationState = () => {
-        taskStatusForm?.querySelectorAll('.is-invalid').forEach((element) => {
-            element.classList.remove('is-invalid');
-        });
+    const openTaskStatusPopup = (trigger) => {
+        openSwalFromSource(taskStatusSource, {
+            beforeOpen: (content) => {
+                clearValidationState(content);
 
-        taskStatusForm?.querySelectorAll('.invalid-feedback').forEach((element) => {
-            element.style.display = 'none';
+                const form = content.querySelector('form');
+                const title = content.querySelector('[data-task-status-task-title]');
+                const client = content.querySelector('[data-task-status-task-client]');
+                const badge = content.querySelector('[data-task-status-task-badge]');
+                const select = content.querySelector('[data-task-status-select]');
+                const taskId = content.querySelector('[data-task-status-task-id]');
+
+                if (form) {
+                    form.setAttribute('action', trigger.getAttribute('data-task-status-action') || '');
+                }
+
+                if (title) {
+                    title.textContent = trigger.getAttribute('data-task-title') || taskStatusDefaultTitle;
+                }
+
+                if (client) {
+                    client.textContent = trigger.getAttribute('data-task-client') || taskStatusDefaultClient;
+                }
+
+                if (badge) {
+                    const statusClass = trigger.getAttribute('data-task-status-class') || 'badge badge-soft';
+                    badge.className = `badge ${statusClass}`.trim();
+                    badge.textContent = trigger.getAttribute('data-task-status-label') || taskStatusDefaultBadgeText;
+                }
+
+                if (select) {
+                    select.value = trigger.getAttribute('data-task-status') || taskStatusDefaultValue;
+                }
+
+                if (taskId) {
+                    taskId.value = trigger.getAttribute('data-task-id') || '';
+                }
+            },
         });
     };
 
     document.querySelectorAll('[data-task-status-trigger]').forEach((trigger) => {
         trigger.addEventListener('click', () => {
-            if (!taskStatusModal) {
+            if (!taskStatusSource) {
                 return;
             }
 
-            clearTaskStatusValidationState();
-
-            const title = trigger.getAttribute('data-task-title') || taskStatusDefaultTitle;
-            const client = trigger.getAttribute('data-task-client') || taskStatusDefaultClient;
-            const status = trigger.getAttribute('data-task-status') || taskStatusDefaultValue;
-            const statusLabel = trigger.getAttribute('data-task-status-label') || taskStatusDefaultBadgeText;
-            const statusClass = trigger.getAttribute('data-task-status-class') || 'badge badge-soft';
-            const action = trigger.getAttribute('data-task-status-action') || '';
-
-            if (taskStatusForm) {
-                taskStatusForm.setAttribute('action', action);
-            }
-
-            if (taskStatusTaskId) {
-                taskStatusTaskId.value = trigger.getAttribute('data-task-id') || '';
-            }
-
-            if (taskStatusTitle) {
-                taskStatusTitle.textContent = title;
-            }
-
-            if (taskStatusClient) {
-                taskStatusClient.textContent = client;
-            }
-
-            if (taskStatusBadge) {
-                taskStatusBadge.className = `badge ${statusClass}`.trim();
-                taskStatusBadge.textContent = statusLabel;
-            }
-
-            if (taskStatusSelect) {
-                taskStatusSelect.value = status;
-            }
-
-            taskStatusModal.show();
+            openTaskStatusPopup(trigger);
         });
-    });
-
-    taskStatusModalElement?.addEventListener('hidden.bs.modal', () => {
-        if (taskStatusForm) {
-            taskStatusForm.setAttribute('action', '');
-        }
-
-        if (taskStatusTaskId) {
-            taskStatusTaskId.value = '';
-        }
-
-        if (taskStatusTitle) {
-            taskStatusTitle.textContent = taskStatusDefaultTitle;
-        }
-
-        if (taskStatusClient) {
-            taskStatusClient.textContent = taskStatusDefaultClient;
-        }
-
-        if (taskStatusBadge) {
-            taskStatusBadge.className = taskStatusDefaultBadgeClass;
-            taskStatusBadge.textContent = taskStatusDefaultBadgeText;
-        }
-
-        if (taskStatusSelect) {
-            taskStatusSelect.value = taskStatusDefaultValue;
-        }
-
-        clearTaskStatusValidationState();
     });
 
     const taskBulkStatusForm = document.querySelector('[data-task-bulk-status-form]');
@@ -302,7 +400,6 @@ window.addEventListener('DOMContentLoaded', () => {
     const taskBulkStatusCount = taskBulkStatusForm?.querySelector('[data-task-bulk-status-count]');
     const taskBulkStatusApply = taskBulkStatusForm?.querySelector('[data-task-bulk-status-apply]');
     const taskBulkStatusPanel = taskBulkStatusForm?.closest('[data-task-bulk-status-panel]');
-    const taskBulkStatusDefaultSelectValue = taskBulkStatusSelect?.value || '';
 
     const syncTaskBulkStatusState = () => {
         const selectedCount = taskBulkStatusCheckboxes.filter((checkbox) => checkbox.checked).length;
@@ -353,261 +450,229 @@ window.addEventListener('DOMContentLoaded', () => {
 
     syncTaskBulkStatusState();
 
-    const taskPriorityModalElement = document.getElementById('task-priority-modal');
-    const taskPriorityModal = taskPriorityModalElement ? bootstrap.Modal.getOrCreateInstance(taskPriorityModalElement) : null;
-    const taskPriorityForm = taskPriorityModalElement?.querySelector('form');
-    const taskPriorityTaskId = taskPriorityModalElement?.querySelector('[data-task-priority-task-id]');
-    const taskPriorityReturnTo = taskPriorityModalElement?.querySelector('[data-task-priority-return-to]');
-    const taskPriorityTitle = taskPriorityModalElement?.querySelector('[data-task-priority-task-title]');
-    const taskPriorityClient = taskPriorityModalElement?.querySelector('[data-task-priority-task-client]');
-    const taskPriorityBadge = taskPriorityModalElement?.querySelector('[data-task-priority-task-badge]');
-    const taskPrioritySelect = taskPriorityModalElement?.querySelector('[data-task-priority-select]');
+    const taskPrioritySource = document.getElementById('task-priority-modal');
+    const taskPriorityTitle = taskPrioritySource?.querySelector('[data-task-priority-task-title]');
+    const taskPriorityClient = taskPrioritySource?.querySelector('[data-task-priority-task-client]');
+    const taskPriorityBadge = taskPrioritySource?.querySelector('[data-task-priority-task-badge]');
+    const taskPrioritySelect = taskPrioritySource?.querySelector('[data-task-priority-select]');
+    const taskPriorityReturnTo = taskPrioritySource?.querySelector('[data-task-priority-return-to]');
     const taskPriorityDefaultTitle = taskPriorityTitle?.textContent || 'Choose a task priority from the table.';
-    const taskPriorityDefaultClient = taskPriorityClient?.textContent || 'The modal will populate from the row you choose.';
+    const taskPriorityDefaultClient = taskPriorityClient?.textContent || 'The popup will populate from the row you choose.';
     const taskPriorityDefaultBadgeText = taskPriorityBadge?.textContent || 'Not selected';
-    const taskPriorityDefaultBadgeClass = taskPriorityBadge?.className || 'badge badge-soft';
     const taskPriorityDefaultValue = taskPrioritySelect?.value || 'medium';
     const taskPriorityDefaultReturnTo = taskPriorityReturnTo?.value || window.location.href;
 
-    const clearTaskPriorityValidationState = () => {
-        taskPriorityForm?.querySelectorAll('.is-invalid').forEach((element) => {
-            element.classList.remove('is-invalid');
-        });
+    const openTaskPriorityPopup = (trigger) => {
+        openSwalFromSource(taskPrioritySource, {
+            beforeOpen: (content) => {
+                clearValidationState(content);
 
-        taskPriorityForm?.querySelectorAll('.invalid-feedback').forEach((element) => {
-            element.style.display = 'none';
+                const form = content.querySelector('form');
+                const title = content.querySelector('[data-task-priority-task-title]');
+                const client = content.querySelector('[data-task-priority-task-client]');
+                const badge = content.querySelector('[data-task-priority-task-badge]');
+                const select = content.querySelector('[data-task-priority-select]');
+                const taskId = content.querySelector('[data-task-priority-task-id]');
+                const returnTo = content.querySelector('[data-task-priority-return-to]');
+
+                if (form) {
+                    form.setAttribute('action', trigger.getAttribute('data-task-priority-action') || '');
+                }
+
+                if (title) {
+                    title.textContent = trigger.getAttribute('data-task-title') || taskPriorityDefaultTitle;
+                }
+
+                if (client) {
+                    client.textContent = trigger.getAttribute('data-task-client') || taskPriorityDefaultClient;
+                }
+
+                if (badge) {
+                    const priorityClass = trigger.getAttribute('data-task-priority-class') || 'badge badge-soft';
+                    badge.className = `badge ${priorityClass}`.trim();
+                    badge.textContent = trigger.getAttribute('data-task-priority-label') || taskPriorityDefaultBadgeText;
+                }
+
+                if (select) {
+                    select.value = trigger.getAttribute('data-task-priority') || taskPriorityDefaultValue;
+                }
+
+                if (taskId) {
+                    taskId.value = trigger.getAttribute('data-task-id') || '';
+                }
+
+                if (returnTo) {
+                    returnTo.value = trigger.getAttribute('data-task-return-to') || taskPriorityDefaultReturnTo;
+                }
+            },
         });
     };
 
     document.querySelectorAll('[data-task-priority-trigger]').forEach((trigger) => {
         trigger.addEventListener('click', () => {
-            if (!taskPriorityModal) {
+            if (!taskPrioritySource) {
                 return;
             }
 
-            clearTaskPriorityValidationState();
-
-            const title = trigger.getAttribute('data-task-title') || taskPriorityDefaultTitle;
-            const client = trigger.getAttribute('data-task-client') || taskPriorityDefaultClient;
-            const priority = trigger.getAttribute('data-task-priority') || taskPriorityDefaultValue;
-            const priorityLabel = trigger.getAttribute('data-task-priority-label') || taskPriorityDefaultBadgeText;
-            const priorityClass = trigger.getAttribute('data-task-priority-class') || 'badge badge-soft';
-            const action = trigger.getAttribute('data-task-priority-action') || '';
-            const returnTo = trigger.getAttribute('data-task-return-to') || taskPriorityDefaultReturnTo;
-
-            if (taskPriorityForm) {
-                taskPriorityForm.setAttribute('action', action);
-            }
-
-            if (taskPriorityTaskId) {
-                taskPriorityTaskId.value = trigger.getAttribute('data-task-id') || '';
-            }
-
-            if (taskPriorityReturnTo) {
-                taskPriorityReturnTo.value = returnTo;
-            }
-
-            if (taskPriorityTitle) {
-                taskPriorityTitle.textContent = title;
-            }
-
-            if (taskPriorityClient) {
-                taskPriorityClient.textContent = client;
-            }
-
-            if (taskPriorityBadge) {
-                taskPriorityBadge.className = `badge ${priorityClass}`.trim();
-                taskPriorityBadge.textContent = priorityLabel;
-            }
-
-            if (taskPrioritySelect) {
-                taskPrioritySelect.value = priority;
-            }
-
-            taskPriorityModal.show();
+            openTaskPriorityPopup(trigger);
         });
     });
 
-    taskPriorityModalElement?.addEventListener('hidden.bs.modal', () => {
-        if (taskPriorityForm) {
-            taskPriorityForm.setAttribute('action', '');
-        }
-
-        if (taskPriorityTaskId) {
-            taskPriorityTaskId.value = '';
-        }
-
-        if (taskPriorityReturnTo) {
-            taskPriorityReturnTo.value = taskPriorityDefaultReturnTo;
-        }
-
-        if (taskPriorityTitle) {
-            taskPriorityTitle.textContent = taskPriorityDefaultTitle;
-        }
-
-        if (taskPriorityClient) {
-            taskPriorityClient.textContent = taskPriorityDefaultClient;
-        }
-
-        if (taskPriorityBadge) {
-            taskPriorityBadge.className = taskPriorityDefaultBadgeClass;
-            taskPriorityBadge.textContent = taskPriorityDefaultBadgeText;
-        }
-
-        if (taskPrioritySelect) {
-            taskPrioritySelect.value = taskPriorityDefaultValue;
-        }
-
-        clearTaskPriorityValidationState();
-    });
-
-    const taskLogModalElement = document.getElementById('task-log-time-modal');
-    const taskLogModal = taskLogModalElement ? bootstrap.Modal.getOrCreateInstance(taskLogModalElement) : null;
-    const taskLogForm = taskLogModalElement?.querySelector('form');
-    const taskLogTaskId = taskLogModalElement?.querySelector('[data-task-log-time-task-id]');
-    const taskLogTitle = taskLogModalElement?.querySelector('[data-task-log-time-task-title]');
-    const taskLogClient = taskLogModalElement?.querySelector('[data-task-log-time-task-client]');
-    const taskLogStatusBadge = taskLogModalElement?.querySelector('[data-task-log-time-task-status-badge]');
-    const taskLogStatusSelect = taskLogModalElement?.querySelector('[data-task-log-time-status]');
-    const taskLogDateInput = taskLogModalElement?.querySelector('[data-task-log-time-date]');
-    const taskLogMinutesInput = taskLogModalElement?.querySelector('[data-task-log-time-minutes]');
-    const taskLogUserInput = taskLogModalElement?.querySelector('[data-task-log-time-user]');
-    const taskLogNotesEditor = taskLogModalElement?.querySelector('[data-rich-editor-editor]');
+    const taskLogSource = document.getElementById('task-log-time-modal');
+    const taskLogTitle = taskLogSource?.querySelector('[data-task-log-time-task-title]');
+    const taskLogClient = taskLogSource?.querySelector('[data-task-log-time-task-client]');
+    const taskLogStatusBadge = taskLogSource?.querySelector('[data-task-log-time-task-status-badge]');
+    const taskLogStatusSelect = taskLogSource?.querySelector('[data-task-log-time-status]');
+    const taskLogDateInput = taskLogSource?.querySelector('[data-task-log-time-date]');
+    const taskLogMinutesInput = taskLogSource?.querySelector('[data-task-log-time-minutes]');
+    const taskLogUserInput = taskLogSource?.querySelector('[data-task-log-time-user]');
+    const taskLogNotesEditor = taskLogSource?.querySelector('[data-rich-editor-editor]');
+    const taskLogTaskId = taskLogSource?.querySelector('[data-task-log-time-task-id]');
     const taskLogDefaultTitle = taskLogTitle?.textContent || 'Choose a task from the table to log time.';
-    const taskLogDefaultClient = taskLogClient?.textContent || 'The modal will populate from the row you choose.';
+    const taskLogDefaultClient = taskLogClient?.textContent || 'The popup will populate from the row you choose.';
     const taskLogDefaultStatusText = taskLogStatusBadge?.textContent || 'Not selected';
-    const taskLogDefaultStatusClass = taskLogStatusBadge?.className || 'badge badge-soft';
     const taskLogDefaultStatusValue = taskLogStatusSelect?.value || 'open';
     const taskLogDefaultDateValue = getLocalDateInputValue();
     const taskLogDefaultUserValue = taskLogUserInput?.value || '';
-    const clearTaskLogNotes = () => {
-        if (!taskLogNotesEditor) {
+
+    const clearTaskLogNotes = (root) => {
+        const editor = root.querySelector('[data-rich-editor-editor]');
+
+        if (!editor) {
             return;
         }
 
-        taskLogNotesEditor.innerHTML = '';
-        syncRichEditor(taskLogNotesEditor);
+        editor.innerHTML = '';
+        syncRichEditor(editor);
     };
-    const clearTaskLogValidationState = () => {
-        taskLogForm?.querySelectorAll('.is-invalid').forEach((element) => {
-            element.classList.remove('is-invalid');
-        });
 
-        taskLogForm?.querySelectorAll('.invalid-feedback').forEach((element) => {
-            element.style.display = 'none';
+    const openTaskLogPopup = (trigger) => {
+        openSwalFromSource(taskLogSource, {
+            beforeOpen: (content) => {
+                clearValidationState(content);
+
+                const form = content.querySelector('form');
+                const title = content.querySelector('[data-task-log-time-task-title]');
+                const client = content.querySelector('[data-task-log-time-task-client]');
+                const badge = content.querySelector('[data-task-log-time-task-status-badge]');
+                const status = content.querySelector('[data-task-log-time-status]');
+                const date = content.querySelector('[data-task-log-time-date]');
+                const minutes = content.querySelector('[data-task-log-time-minutes]');
+                const user = content.querySelector('[data-task-log-time-user]');
+                const taskId = content.querySelector('[data-task-log-time-task-id]');
+
+                if (form) {
+                    form.setAttribute('action', taskLogSource?.querySelector('form')?.getAttribute('action') || '');
+                }
+
+                if (title) {
+                    title.textContent = trigger.getAttribute('data-task-title') || taskLogDefaultTitle;
+                }
+
+                if (client) {
+                    client.textContent = trigger.getAttribute('data-task-client') || taskLogDefaultClient;
+                }
+
+                if (badge) {
+                    const statusClass = trigger.getAttribute('data-task-status-class') || 'badge badge-soft';
+                    badge.className = `badge ${statusClass}`.trim();
+                    badge.textContent = trigger.getAttribute('data-task-status-label') || taskLogDefaultStatusText;
+                }
+
+                if (status) {
+                    status.value = trigger.getAttribute('data-task-status') || taskLogDefaultStatusValue;
+                }
+
+                if (date) {
+                    date.value = taskLogDefaultDateValue;
+                }
+
+                if (minutes) {
+                    minutes.value = '';
+                }
+
+                if (user) {
+                    user.value = taskLogDefaultUserValue;
+                }
+
+                if (taskId) {
+                    taskId.value = trigger.getAttribute('data-task-id') || '';
+                }
+
+                clearTaskLogNotes(content);
+            },
         });
     };
 
     document.querySelectorAll('[data-task-log-time-trigger]').forEach((trigger) => {
         trigger.addEventListener('click', () => {
-            if (!taskLogModal) {
+            if (!taskLogSource) {
                 return;
             }
 
-            clearTaskLogValidationState();
-
-            const title = trigger.getAttribute('data-task-title') || taskLogDefaultTitle;
-            const client = trigger.getAttribute('data-task-client') || taskLogDefaultClient;
-            const status = trigger.getAttribute('data-task-status') || taskLogDefaultStatusValue;
-            const statusLabel = trigger.getAttribute('data-task-status-label') || taskLogDefaultStatusText;
-            const statusClass = trigger.getAttribute('data-task-status-class') || 'badge badge-soft';
-
-            if (taskLogTaskId) {
-                taskLogTaskId.value = trigger.getAttribute('data-task-id') || '';
-            }
-
-            if (taskLogTitle) {
-                taskLogTitle.textContent = title;
-            }
-
-            if (taskLogClient) {
-                taskLogClient.textContent = client;
-            }
-
-            if (taskLogStatusBadge) {
-                taskLogStatusBadge.className = `badge ${statusClass}`.trim();
-                taskLogStatusBadge.textContent = statusLabel;
-            }
-
-            if (taskLogStatusSelect) {
-                taskLogStatusSelect.value = status;
-            }
-
-            if (taskLogDateInput) {
-                taskLogDateInput.value = taskLogDefaultDateValue;
-            }
-
-            if (taskLogMinutesInput) {
-                taskLogMinutesInput.value = '';
-            }
-
-            if (taskLogUserInput) {
-                taskLogUserInput.value = taskLogDefaultUserValue;
-            }
-
-            clearTaskLogNotes();
-
-            taskLogModal.show();
+            openTaskLogPopup(trigger);
         });
     });
 
-    taskLogModalElement?.addEventListener('hidden.bs.modal', () => {
-        if (taskLogTaskId) {
-            taskLogTaskId.value = '';
-        }
-
-        if (taskLogTitle) {
-            taskLogTitle.textContent = taskLogDefaultTitle;
-        }
-
-        if (taskLogClient) {
-            taskLogClient.textContent = taskLogDefaultClient;
-        }
-
-        if (taskLogStatusBadge) {
-            taskLogStatusBadge.className = taskLogDefaultStatusClass;
-            taskLogStatusBadge.textContent = taskLogDefaultStatusText;
-        }
-
-        if (taskLogStatusSelect) {
-            taskLogStatusSelect.value = taskLogDefaultStatusValue;
-        }
-
-        if (taskLogDateInput) {
-            taskLogDateInput.value = taskLogDefaultDateValue;
-        }
-
-        if (taskLogMinutesInput) {
-            taskLogMinutesInput.value = '';
-        }
-
-        if (taskLogUserInput) {
-            taskLogUserInput.value = taskLogDefaultUserValue;
-        }
-
-        clearTaskLogNotes();
-        clearTaskLogValidationState();
-    });
-
-    const timeEntryEditModalElement = document.getElementById('time-entry-edit-modal');
-    const timeEntryEditModal = timeEntryEditModalElement ? bootstrap.Modal.getOrCreateInstance(timeEntryEditModalElement) : null;
-    const timeEntryEditForm = timeEntryEditModalElement?.querySelector('form');
-    const timeEntryEditUserInput = timeEntryEditModalElement?.querySelector('[name="user_id"]');
-    const timeEntryEditTaskInput = timeEntryEditModalElement?.querySelector('[name="task_id"]');
-    const timeEntryEditDateInput = timeEntryEditModalElement?.querySelector('[name="date"]');
-    const timeEntryEditMinutesInput = timeEntryEditModalElement?.querySelector('[name="minutes"]');
-    const timeEntryEditEditingInput = timeEntryEditModalElement?.querySelector('[name="editing_entry"]');
-    const timeEntryEditReturnToInput = timeEntryEditModalElement?.querySelector('[name="return_to"]');
-    const timeEntryEditNotesEditor = timeEntryEditModalElement?.querySelector('[data-rich-editor-editor]');
+    const timeEntryEditSource = document.getElementById('time-entry-edit-modal');
+    const timeEntryEditForm = timeEntryEditSource?.querySelector('form');
+    const timeEntryEditUserInput = timeEntryEditSource?.querySelector('[name="user_id"]');
+    const timeEntryEditTaskInput = timeEntryEditSource?.querySelector('[name="task_id"]');
+    const timeEntryEditDateInput = timeEntryEditSource?.querySelector('[name="date"]');
+    const timeEntryEditMinutesInput = timeEntryEditSource?.querySelector('[name="minutes"]');
+    const timeEntryEditEditingInput = timeEntryEditSource?.querySelector('[name="editing_entry"]');
+    const timeEntryEditReturnToInput = timeEntryEditSource?.querySelector('[name="return_to"]');
+    const timeEntryEditNotesEditor = timeEntryEditSource?.querySelector('[data-rich-editor-editor]');
     const timeEntryEditDefaultAction = timeEntryEditForm?.getAttribute('action') || '';
     const timeEntryEditDefaultReturnTo = timeEntryEditReturnToInput?.value || '';
-    const clearTimeEntryEditValidationState = () => {
-        timeEntryEditForm?.querySelectorAll('.is-invalid').forEach((element) => {
-            element.classList.remove('is-invalid');
-        });
 
-        timeEntryEditForm?.querySelectorAll('.invalid-feedback').forEach((element) => {
-            element.style.display = 'none';
+    const openTimeEntryEditPopup = (trigger) => {
+        openSwalFromSource(timeEntryEditSource, {
+            beforeOpen: (content) => {
+                clearValidationState(content);
+
+                const form = content.querySelector('form');
+                const userInput = content.querySelector('[name="user_id"]');
+                const taskInput = content.querySelector('[name="task_id"]');
+                const dateInput = content.querySelector('[name="date"]');
+                const minutesInput = content.querySelector('[name="minutes"]');
+                const editingInput = content.querySelector('[name="editing_entry"]');
+                const returnToInput = content.querySelector('[name="return_to"]');
+                const notesEditor = content.querySelector('[data-rich-editor-editor]');
+
+                if (form) {
+                    form.setAttribute('action', trigger.getAttribute('data-time-entry-edit-action') || timeEntryEditDefaultAction);
+                }
+
+                if (returnToInput) {
+                    returnToInput.value = trigger.getAttribute('data-time-entry-edit-return-to') || timeEntryEditDefaultReturnTo;
+                }
+
+                if (editingInput) {
+                    editingInput.value = trigger.getAttribute('data-time-entry-edit-id') || '';
+                }
+
+                if (userInput) {
+                    userInput.value = trigger.getAttribute('data-time-entry-edit-user-id') || '';
+                }
+
+                if (taskInput) {
+                    taskInput.value = trigger.getAttribute('data-time-entry-edit-task-id') || '';
+                }
+
+                if (dateInput) {
+                    dateInput.value = trigger.getAttribute('data-time-entry-edit-date') || '';
+                }
+
+                if (minutesInput) {
+                    minutesInput.value = trigger.getAttribute('data-time-entry-edit-minutes') || '';
+                }
+
+                if (notesEditor) {
+                    notesEditor.innerHTML = trigger.getAttribute('data-time-entry-edit-notes') || '';
+                    syncRichEditor(notesEditor);
+                }
+            },
         });
     };
 
@@ -615,140 +680,81 @@ window.addEventListener('DOMContentLoaded', () => {
         trigger.addEventListener('click', (event) => {
             event.preventDefault();
 
-            if (!timeEntryEditModal) {
+            if (!timeEntryEditSource) {
                 return;
             }
 
-            clearTimeEntryEditValidationState();
-
-            if (timeEntryEditForm) {
-                timeEntryEditForm.setAttribute('action', trigger.getAttribute('data-time-entry-edit-action') || timeEntryEditDefaultAction);
-            }
-
-            if (timeEntryEditReturnToInput) {
-                timeEntryEditReturnToInput.value = trigger.getAttribute('data-time-entry-edit-return-to') || timeEntryEditDefaultReturnTo;
-            }
-
-            if (timeEntryEditEditingInput) {
-                timeEntryEditEditingInput.value = trigger.getAttribute('data-time-entry-edit-id') || '';
-            }
-
-            if (timeEntryEditUserInput) {
-                timeEntryEditUserInput.value = trigger.getAttribute('data-time-entry-edit-user-id') || '';
-            }
-
-            if (timeEntryEditTaskInput) {
-                timeEntryEditTaskInput.value = trigger.getAttribute('data-time-entry-edit-task-id') || '';
-            }
-
-            if (timeEntryEditDateInput) {
-                timeEntryEditDateInput.value = trigger.getAttribute('data-time-entry-edit-date') || '';
-            }
-
-            if (timeEntryEditMinutesInput) {
-                timeEntryEditMinutesInput.value = trigger.getAttribute('data-time-entry-edit-minutes') || '';
-            }
-
-            if (timeEntryEditNotesEditor) {
-                timeEntryEditNotesEditor.innerHTML = trigger.getAttribute('data-time-entry-edit-notes') || '';
-                syncRichEditor(timeEntryEditNotesEditor);
-            }
-
-            timeEntryEditModal.show();
+            openTimeEntryEditPopup(trigger);
         });
     });
 
-    timeEntryEditModalElement?.addEventListener('hidden.bs.modal', () => {
-        if (timeEntryEditForm) {
-            timeEntryEditForm.setAttribute('action', '');
-        }
-
-        if (timeEntryEditReturnToInput) {
-            timeEntryEditReturnToInput.value = timeEntryEditDefaultReturnTo;
-        }
-
-        if (timeEntryEditEditingInput) {
-            timeEntryEditEditingInput.value = '';
-        }
-
-        if (timeEntryEditUserInput) {
-            timeEntryEditUserInput.value = '';
-        }
-
-        if (timeEntryEditTaskInput) {
-            timeEntryEditTaskInput.value = '';
-        }
-
-        if (timeEntryEditDateInput) {
-            timeEntryEditDateInput.value = '';
-        }
-
-        if (timeEntryEditMinutesInput) {
-            timeEntryEditMinutesInput.value = '';
-        }
-
-        if (timeEntryEditNotesEditor) {
-            timeEntryEditNotesEditor.innerHTML = '';
-            syncRichEditor(timeEntryEditNotesEditor);
-        }
-
-        clearTimeEntryEditValidationState();
-    });
-
-    const deleteModalElement = document.getElementById('delete-confirmation-modal');
-    const deleteForm = document.getElementById('delete-confirmation-form');
-    const deleteTitle = document.getElementById('delete-confirmation-title');
-    const deleteMessage = document.getElementById('delete-confirmation-message');
-    const deleteSubmit = document.getElementById('delete-confirmation-submit');
-    const deleteMethod = document.getElementById('delete-confirmation-method');
-    const deleteReturnToInput = document.getElementById('delete-confirmation-return-to');
-    const deleteModal = deleteModalElement ? bootstrap.Modal.getOrCreateInstance(deleteModalElement) : null;
+    const deleteSource = document.getElementById('delete-confirmation-modal');
+    const deleteForm = deleteSource?.querySelector('#delete-confirmation-form');
+    const deleteTitle = deleteSource?.querySelector('#delete-confirmation-title');
+    const deleteMessage = deleteSource?.querySelector('#delete-confirmation-message');
+    const deleteSubmit = deleteSource?.querySelector('#delete-confirmation-submit');
+    const deleteMethod = deleteSource?.querySelector('#delete-confirmation-method');
+    const deleteReturnToInput = deleteSource?.querySelector('#delete-confirmation-return-to');
     const deleteDefaultReturnTo = deleteReturnToInput?.value || '';
 
     document.querySelectorAll('[data-delete-confirm]').forEach((trigger) => {
         trigger.addEventListener('click', () => {
-            if (!deleteModal || !deleteForm) {
+            if (!deleteSource) {
                 return;
             }
 
-            const action = trigger.getAttribute('data-delete-action') || '';
-            const title = trigger.getAttribute('data-delete-title') || 'Delete item';
-            const message = trigger.getAttribute('data-delete-message') || 'Are you sure you want to delete this item? This action cannot be undone.';
-            const submitLabel = trigger.getAttribute('data-delete-submit') || 'Delete';
-            const method = (trigger.getAttribute('data-delete-method') || 'DELETE').toUpperCase();
+            openSwalFromSource(deleteSource, {
+                beforeOpen: (content) => {
+                    clearValidationState(content);
 
-            deleteForm.setAttribute('action', action);
-            if (deleteMethod) {
-                deleteMethod.value = method;
-            }
-            if (deleteReturnToInput) {
-                deleteReturnToInput.value = trigger.getAttribute('data-delete-return-to') || deleteDefaultReturnTo;
-            }
-            deleteTitle && (deleteTitle.textContent = title);
-            deleteMessage && (deleteMessage.textContent = message);
+                    const form = content.querySelector('#delete-confirmation-form');
+                    const title = content.querySelector('#delete-confirmation-title');
+                    const message = content.querySelector('#delete-confirmation-message');
+                    const submit = content.querySelector('#delete-confirmation-submit');
+                    const method = content.querySelector('#delete-confirmation-method');
+                    const returnTo = content.querySelector('#delete-confirmation-return-to');
 
-            if (deleteSubmit) {
-                deleteSubmit.innerHTML = `<i class="bi bi-trash me-1"></i>${submitLabel}`;
-                deleteSubmit.setAttribute('data-loading-text', `${submitLabel}...`);
-            }
+                    if (form) {
+                        form.setAttribute('action', trigger.getAttribute('data-delete-action') || '');
+                    }
 
-            deleteModal.show();
+                    if (method) {
+                        method.value = (trigger.getAttribute('data-delete-method') || 'DELETE').toUpperCase();
+                    }
+
+                    if (returnTo) {
+                        returnTo.value = trigger.getAttribute('data-delete-return-to') || deleteDefaultReturnTo;
+                    }
+
+                    if (title) {
+                        title.textContent = trigger.getAttribute('data-delete-title') || 'Delete item';
+                    }
+
+                    if (message) {
+                        message.textContent = trigger.getAttribute('data-delete-message') || 'Are you sure you want to delete this item? This action cannot be undone.';
+                    }
+
+                    if (submit) {
+                        const submitLabel = trigger.getAttribute('data-delete-submit') || 'Delete';
+                        submit.innerHTML = `<i class="bi bi-trash me-1"></i>${submitLabel}`;
+                        submit.setAttribute('data-loading-text', `${submitLabel}...`);
+                    }
+                },
+            });
         });
     });
 
-    deleteModalElement?.addEventListener('hidden.bs.modal', () => {
-        deleteForm?.setAttribute('action', '');
-        if (deleteMethod) {
-            deleteMethod.value = 'DELETE';
-        }
-        if (deleteReturnToInput) {
-            deleteReturnToInput.value = deleteDefaultReturnTo;
-        }
-    });
+    document.querySelectorAll('[data-swal-open]').forEach((trigger) => {
+        trigger.addEventListener('click', () => {
+            const source = document.getElementById(trigger.getAttribute('data-swal-open') || '');
 
-    document.querySelectorAll('form').forEach((form) => {
-        form.addEventListener('submit', () => {
-            setLoadingState(form);
+            if (!source) {
+                return;
+            }
+
+            openSwalFromSource(source);
         });
     });
+
+    bindLoadingStateForRoot(document);
 });

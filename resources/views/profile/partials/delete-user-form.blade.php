@@ -23,8 +23,8 @@
             </div>
             <x-danger-button
                 class="btn btn-danger profile-danger-button"
-                data-bs-toggle="modal"
-                data-bs-target="#confirm-user-deletion"
+                type="button"
+                data-swal-open="confirm-user-deletion"
             >{{ __('Delete Account') }}</x-danger-button>
         </div>
 
@@ -40,7 +40,7 @@
                             {{ __('Are you sure you want to delete your account?') }}
                         </h2>
                     </div>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ __('Close') }}"></button>
+                    <button type="button" class="btn-close" data-swal-close aria-label="{{ __('Close') }}"></button>
                 </div>
 
                 <div class="modal-body profile-modal-body">
@@ -70,7 +70,7 @@
                 </div>
 
                 <div class="modal-footer profile-modal-footer">
-                    <x-secondary-button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <x-secondary-button type="button" class="btn btn-outline-secondary" data-swal-close>
                         {{ __('Cancel') }}
                     </x-secondary-button>
 

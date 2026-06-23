@@ -181,7 +181,9 @@
                                 @forelse ($task->timeEntries as $entry)
                                     <tr>
                                         <td>{{ $entry->date->format('M d, Y') }}</td>
-                                        <td>{{ $entry->user->name }}</td>
+                                        <td>
+                                            <x-user-identity :name="$entry->user->name" seed="{{ $entry->user_id }}" />
+                                        </td>
                                         <td>{{ \App\Support\RichText::excerpt($entry->notes) }}</td>
                                         <td class="text-end fw-semibold">{{ \App\Support\TimeDisplay::formatHours($entry->hours) }}</td>
                                         <td class="text-end">
@@ -294,12 +296,14 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @forelse ($task->progressEntries as $update)
-                                        <tr>
-                                            <td>{{ $update->date->format('M d, Y') }}</td>
-                                            <td>{{ $update->user->name }}</td>
-                                            <td>{{ \App\Support\RichText::excerpt($update->notes) }}</td>
-                                        </tr>
+                                @forelse ($task->progressEntries as $update)
+                                    <tr>
+                                        <td>{{ $update->date->format('M d, Y') }}</td>
+                                        <td>
+                                            <x-user-identity :name="$update->user->name" seed="{{ $update->user_id }}" />
+                                        </td>
+                                        <td>{{ \App\Support\RichText::excerpt($update->notes) }}</td>
+                                    </tr>
                                     @empty
                                         <tr>
                                             <td colspan="3">

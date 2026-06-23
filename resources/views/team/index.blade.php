@@ -1,22 +1,10 @@
 <x-app-layout>
     <x-slot name="header">Team Management</x-slot>
-
-    <section class="page-hero p-4 p-lg-5 mb-4">
-        <div class="row align-items-center g-4">
-            <div class="col-lg-8">
-                <div class="page-kicker mb-2">Team workspace</div>
-                <h2 class="page-title h1 mb-3">Review teams and update access from one place.</h2>
-                <p class="page-subtitle mb-0">
-                    The team view now shares the same responsive card and table treatment as the rest of the app.
-                </p>
-            </div>
-            <div class="col-lg-4 text-lg-end">
-                <a class="btn btn-outline-light" href="{{ route('users.index') }}">
-                    <i class="bi bi-people me-1"></i> Open Users
-                </a>
-            </div>
-        </div>
-    </section>
+    <x-slot name="actions">
+        <a class="btn btn-outline-secondary btn-lg" href="{{ route('users.index') }}">
+            <i class="bi bi-people me-1"></i> Open Users
+        </a>
+    </x-slot>
 
     <div class="row g-4">
         <div class="col-lg-4">
@@ -64,7 +52,9 @@
                         <tbody>
                             @forelse ($users as $user)
                                 <tr>
-                                    <td>{{ $user->name }}</td>
+                                    <td>
+                                        <x-user-identity :name="$user->name" seed="{{ $user->id }}" />
+                                    </td>
                                     <td>{{ $user->email }}</td>
                                     <td>{{ $user->team?->name ?: 'No team' }}</td>
                                     <td class="text-capitalize">{{ $user->role }}</td>
@@ -84,7 +74,7 @@
                                                         <option value="{{ $team->id }}" @selected($user->team_id === $team->id)>{{ $team->name }}</option>
                                                     @endforeach
                                                 </select>
-                                                <button class="btn btn-sm btn-primary" data-loading-text="Saving...">
+                                                <button class="btn btn-outline-primary table-action-icon-btn table-action-primary" data-loading-text="Saving..." aria-label="Save {{ $user->name }}">
                                                     <i class="bi bi-save"></i>
                                                 </button>
                                             </form>

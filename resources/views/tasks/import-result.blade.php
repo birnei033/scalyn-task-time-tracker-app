@@ -1,22 +1,10 @@
 <x-app-layout>
     <x-slot name="header">Import Results</x-slot>
-
-    <section class="page-hero p-4 p-lg-5 mb-4">
-        <div class="row align-items-center g-4">
-            <div class="col-lg-8">
-                <div class="page-kicker mb-2">Import complete</div>
-                <h2 class="page-title h1 mb-3">We processed your CSV file.</h2>
-                <p class="page-subtitle mb-0">
-                    Review the created tasks and any rows that were skipped or rejected.
-                </p>
-            </div>
-            <div class="col-lg-4 text-lg-end">
-                <a href="{{ route('tasks.import.create') }}" class="btn btn-outline-secondary btn-lg">
-                    Import Another File
-                </a>
-            </div>
-        </div>
-    </section>
+    <x-slot name="actions">
+        <a href="{{ route('tasks.import.create') }}" class="btn btn-outline-secondary btn-lg">
+            Import Another File
+        </a>
+    </x-slot>
 
     <div class="row g-4 mb-4">
         <div class="col-md-4">

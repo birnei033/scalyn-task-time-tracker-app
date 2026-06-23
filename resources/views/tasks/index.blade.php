@@ -1,43 +1,46 @@
 <x-app-layout>
     <x-slot name="header">Tasks</x-slot>
-    @php($bulkSelectionEnabled = $tasks->getCollection()->contains(fn ($task) => auth()->user()->can('update', $task)))
-    @php($showTaskStatusModal = old('modal_form') === 'task-status-modal')
-    @php($showTaskPriorityModal = old('modal_form') === 'task-priority-modal')
-    @php($showTaskLogTimeModal = old('modal_form') === 'task-log-time-modal')
-    @php($bulkSelectedTaskIds = old('task_ids', []))
-    @php($bulkStatusValue = old('status'))
+    <x-slot name="actions">
+        @can('create', \App\Models\Task::class)
+            <a href="{{ route('tasks.import.create') }}" class="btn btn-outline-secondary btn-lg">
+                <i class="bi bi-upload me-1"></i> Import CSV
+            </a>
+            <a href="{{ route('tasks.create') }}" class="btn btn-primary btn-lg">
+                <i class="bi bi-plus-lg me-1"></i> Create Task
+            </a>
+        @endcan
+    </x-slot>
+    @php
+        $bulkSelectionEnabled = $tasks->getCollection()->contains(fn ($task) => auth()->user()->can('update', $task));
+        $showTaskStatusModal = old('modal_form') === 'task-status-modal';
+        $showTaskPriorityModal = old('modal_form') === 'task-priority-modal';
+        $showTaskLogTimeModal = old('modal_form') === 'task-log-time-modal';
+        $bulkSelectedTaskIds = old('task_ids', []);
+        $bulkStatusValue = old('status');
+        $statusPillClasses = [
+            'open' => 'task-pill task-pill-open',
+            'in_progress' => 'task-pill task-pill-in-progress',
+            'completed' => 'task-pill task-pill-completed',
+            'on_hold' => 'task-pill task-pill-on-hold',
+            'to_review' => 'task-pill task-pill-review',
+        ];
+        $priorityPillClasses = [
+            'low' => 'task-pill task-pill-low',
+            'medium' => 'task-pill task-pill-medium',
+            'high' => 'task-pill task-pill-high',
+        ];
+    @endphp
 
-    <section class="page-hero p-4 p-lg-5 mb-4">
-        <div class="row align-items-center g-4">
-            <div class="col-lg-8">
-                <div class="page-kicker mb-2">Task management</div>
-                <h2 class="page-title h1 mb-3">Manage work with clearer status and priority signals.</h2>
-                <p class="page-subtitle mb-0">
-                    Filter, review, and edit tasks from a table that stays usable on desktop and mobile.
-                </p>
-            </div>
-            <div class="col-lg-4 text-lg-end">
-                @can('create', \App\Models\Task::class)
-                    <div class="d-flex flex-column flex-lg-row justify-content-lg-end gap-2">
-                        <a href="{{ route('tasks.import.create') }}" class="btn btn-outline-secondary btn-lg">
-                            <i class="bi bi-upload me-1"></i> Import CSV
-                        </a>
-                        <a href="{{ route('tasks.create') }}" class="btn btn-primary btn-lg">
-                            <i class="bi bi-plus-lg me-1"></i> Create Task
-                        </a>
-                    </div>
-                @endcan
-            </div>
-        </div>
-    </section>
-
-    <div class="surface-card p-4 mb-4">
-        <form class="row g-3 align-items-end" method="GET" action="{{ route('tasks.index') }}">
-            <div class="col-lg-4">
+    <div class="surface-card task-filter-card p-4 mb-4">
+        <form class="row g-3 align-items-end task-filter-form" method="GET" action="{{ route('tasks.index') }}">
+            <div class="col-12 col-md-6 col-xl-3 task-filter-search">
                 <label class="form-label">Search</label>
-                <input class="form-control" name="search" placeholder="Search tasks" value="{{ request('search') }}">
+                <div class="task-search-wrap">
+                    <i class="bi bi-search task-search-icon" aria-hidden="true"></i>
+                    <input class="form-control task-search-input" name="search" placeholder="Search tasks" value="{{ request('search') }}">
+                </div>
             </div>
-            <div class="col-lg-2">
+            <div class="col-12 col-md-6 col-xl-2">
                 <label class="form-label">Status</label>
                 <select class="form-select" name="status">
                     <option value="">All statuses</option>
@@ -46,7 +49,7 @@
                     @endforeach
                 </select>
             </div>
-            <div class="col-lg-3">
+            <div class="col-12 col-md-6 col-xl-2">
                 <label class="form-label">Client</label>
                 <select class="form-select" name="client_id">
                     <option value="">All clients</option>
@@ -56,7 +59,7 @@
                 </select>
             </div>
             @if (auth()->user()->canManageTeam())
-                <div class="col-lg-3">
+                <div class="col-12 col-md-6 col-xl-2">
                     <label class="form-label">Assigned</label>
                     <select class="form-select" name="assigned_user_id">
                         <option value="">All assignees</option>
@@ -66,7 +69,7 @@
                     </select>
                 </div>
             @endif
-            <div class="col-12 d-flex flex-wrap gap-2">
+            <div class="col-12 col-xl-auto task-filter-actions">
                 <button class="btn btn-primary filter-action-btn" type="submit" data-loading-text="Filtering...">
                     <i class="bi bi-search me-1"></i> Search
                 </button>
@@ -77,7 +80,7 @@
         </form>
     </div>
 
-    <div class="table-panel">
+    <div class="table-panel task-table-panel">
         <div class="table-panel-header">
             <div>
                 <div class="table-panel-eyebrow mb-1">Backlog</div>
@@ -87,20 +90,22 @@
         </div>
 
         @if ($bulkSelectionEnabled)
-            @php($bulkTaskIdsError = $errors->first('task_ids') ?: $errors->first('task_ids.0'))
-            <div class="border-top border-bottom bg-body-tertiary px-3 py-3 px-lg-4 py-lg-3" data-task-bulk-status-panel>
+            @php
+                $bulkTaskIdsError = $errors->first('task_ids') ?: $errors->first('task_ids.0');
+            @endphp
+            <div class="task-bulk-panel" data-task-bulk-status-panel>
                 <form
                     method="POST"
                     action="{{ route('tasks.bulk-status.update') }}"
-                    class="d-flex flex-column flex-xl-row align-items-stretch align-items-xl-end gap-3 gap-xl-4"
+                    class="task-bulk-form d-flex flex-column flex-lg-row align-items-start align-items-lg-center gap-3 gap-lg-4"
                     data-task-bulk-status-form
                     id="task-bulk-status-form"
                 >
                     @csrf
                     <input type="hidden" name="return_to" value="{{ request()->fullUrl() }}">
 
-                    <div class="d-flex flex-column flex-sm-row flex-wrap gap-3 gap-xl-4 flex-grow-1">
-                        <div class="d-flex flex-column gap-1" style="min-width: 14rem;">
+                    <div class="task-bulk-fields d-flex flex-column flex-sm-row align-items-start align-items-sm-center flex-wrap gap-3 gap-sm-4 flex-grow-1">
+                        <div class="task-bulk-control d-flex flex-column gap-1">
                             <label class="form-label mb-0 small text-uppercase fw-semibold text-muted">Bulk status</label>
                             <select class="form-select form-select-sm @error('status') is-invalid @enderror" name="status" data-task-bulk-status-select>
                                 <option value="">Choose a status</option>
@@ -111,15 +116,15 @@
                             @error('status')<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                         </div>
 
-                        <div class="d-flex flex-column gap-1">
+                        <div class="task-bulk-selected d-flex flex-column gap-1">
                             <div class="small text-uppercase fw-semibold text-muted">Selected tasks</div>
                             <div class="fw-semibold" data-task-bulk-status-count>0 selected</div>
                         </div>
                     </div>
 
-                    <div class="d-flex flex-column align-items-start align-items-xl-end gap-2 ms-xl-auto">
+                    <div class="task-bulk-actions d-flex align-items-center ms-lg-auto">
                         <button
-                            class="btn btn-primary btn-sm px-3"
+                            class="btn btn-outline-secondary btn-sm px-3 task-bulk-apply"
                             type="submit"
                             data-task-bulk-status-apply
                             data-loading-text="Applying status..."
@@ -137,11 +142,11 @@
         @endif
 
         <div class="table-responsive">
-            <table class="table table-hover align-middle">
+            <table class="table align-middle task-table">
                 <thead>
                     <tr>
                         @if ($bulkSelectionEnabled)
-                            <th class="text-center" style="width: 1%">
+                            <th class="text-center task-table-check-column" style="width: 1%">
                                 <input
                                     class="form-check-input"
                                     type="checkbox"
@@ -150,16 +155,34 @@
                                 >
                             </th>
                         @endif
-                        <th>Task</th>
-                        <th>Client</th>
-                        <th>Assigned</th>
-                        <th>Status</th>
-                        <th>Priority</th>
-                        <th class="text-end">Actions</th>
+                        <th class="task-table-task-column">Task</th>
+                        <th class="task-table-client-column">Client</th>
+                        <th class="task-table-assigned-column">Assigned</th>
+                        <th class="task-table-status-column">Status</th>
+                        <th class="task-table-priority-column">Priority</th>
+                        <th class="text-end task-table-actions-column">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse ($tasks as $task)
+                        @php
+                            $assignedName = $task->assignedUser?->name ?: 'Unassigned';
+                            $assignedParts = preg_split('/\s+/', trim($assignedName)) ?: [];
+                            $assignedInitials = collect($assignedParts)
+                                ->filter()
+                                ->map(fn ($part) => mb_substr($part, 0, 1))
+                                ->take(2)
+                                ->implode('');
+                            $assignedInitials = $assignedInitials ?: 'U';
+                            $assigneeAvatarClasses = [
+                                'task-assignee-avatar-1',
+                                'task-assignee-avatar-2',
+                                'task-assignee-avatar-3',
+                                'task-assignee-avatar-4',
+                                'task-assignee-avatar-5',
+                            ];
+                            $assignedAvatarClass = $assigneeAvatarClasses[$task->id % count($assigneeAvatarClasses)];
+                        @endphp
                         <tr>
                             @if ($bulkSelectionEnabled)
                                 <td class="text-center">
@@ -175,29 +198,34 @@
                                             @checked(in_array((string) $task->id, $bulkSelectedTaskIds, true))
                                         >
                                     @else
-                                        <span class="text-muted">—</span>
+                                        <span class="text-muted">&mdash;</span>
                                     @endcan
                                 </td>
                             @endif
-                            <td>
+                            <td class="task-table-task-cell">
                                 @can('view', $task)
                                     <a
                                         href="{{ route('tasks.show', $task) }}"
-                                        class="btn btn-link p-0 fw-semibold text-decoration-none align-baseline"
+                                        class="task-table-link"
                                     >
                                         {{ $task->title }}
                                     </a>
                                 @else
-                                    <span class="fw-semibold">{{ $task->title }}</span>
+                                    <span class="task-table-link">{{ $task->title }}</span>
                                 @endcan
                             </td>
-                            <td>{{ $task->client->name }}</td>
-                            <td>{{ $task->assignedUser?->name ?: 'Unassigned' }}</td>
-                            <td>
+                            <td class="task-table-client-cell">{{ $task->client->name }}</td>
+                            <td class="task-table-assigned-cell">
+                                <span class="task-assignee">
+                                    <span class="task-assignee-avatar {{ $assignedAvatarClass }}">{{ $assignedInitials }}</span>
+                                    <span class="task-assignee-name">{{ $assignedName }}</span>
+                                </span>
+                            </td>
+                            <td class="task-table-status-cell">
                                 @can('update', $task)
                                     <button
                                         type="button"
-                                        class="btn btn-link p-0 text-decoration-none align-baseline"
+                                        class="task-pill-trigger"
                                         aria-label="Update status for {{ $task->title }}"
                                         data-task-status-trigger
                                         data-task-id="{{ $task->id }}"
@@ -208,17 +236,23 @@
                                         data-task-status-class="{{ $task->statusBadgeClass() }}"
                                         data-task-status-action="{{ route('tasks.status.update', $task) }}"
                                     >
-                                        <span class="badge {{ $task->statusBadgeClass() }}">{{ $task->statusLabel() }}</span>
+                                        <span class="{{ $statusPillClasses[$task->status] ?? 'task-pill' }}">
+                                            <span class="task-pill-dot"></span>
+                                            <span>{{ $task->statusLabel() }}</span>
+                                        </span>
                                     </button>
                                 @else
-                                    <span class="badge {{ $task->statusBadgeClass() }}">{{ $task->statusLabel() }}</span>
+                                    <span class="{{ $statusPillClasses[$task->status] ?? 'task-pill' }}">
+                                        <span class="task-pill-dot"></span>
+                                        <span>{{ $task->statusLabel() }}</span>
+                                    </span>
                                 @endcan
                             </td>
-                            <td>
+                            <td class="task-table-priority-cell">
                                 @can('update', $task)
                                     <button
                                         type="button"
-                                        class="btn btn-link p-0 text-decoration-none align-baseline"
+                                        class="task-pill-trigger"
                                         aria-label="Update priority for {{ $task->title }}"
                                         data-task-priority-trigger
                                         data-task-id="{{ $task->id }}"
@@ -230,51 +264,61 @@
                                         data-task-priority-action="{{ route('tasks.priority.update', $task) }}"
                                         data-task-return-to="{{ request()->fullUrl() }}"
                                     >
-                                        <span class="badge {{ $task->priorityBadgeClass() }}">{{ $task->priorityLabel() }}</span>
+                                        <span class="{{ $priorityPillClasses[$task->priority] ?? 'task-pill' }}">
+                                            <span class="task-pill-dot"></span>
+                                            <span>{{ $task->priorityLabel() }}</span>
+                                        </span>
                                     </button>
                                 @else
-                                    <span class="badge {{ $task->priorityBadgeClass() }}">{{ $task->priorityLabel() }}</span>
+                                    <span class="{{ $priorityPillClasses[$task->priority] ?? 'task-pill' }}">
+                                        <span class="task-pill-dot"></span>
+                                        <span>{{ $task->priorityLabel() }}</span>
+                                    </span>
                                 @endcan
                             </td>
-                            <td class="text-end">
-                                @can('view', $task)
-                                    <a class="btn btn-sm btn-outline-primary" href="{{ route('tasks.show', $task) }}">
-                                        <i class="bi bi-eye"></i>
-                                    </a>
-                                @endcan
-                                @can('update', $task)
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-outline-success"
-                                        data-task-log-time-trigger
-                                        data-task-id="{{ $task->id }}"
-                                        data-task-title="{{ $task->title }}"
-                                        data-task-client="{{ $task->client->name }}"
-                                        data-task-status="{{ $task->status }}"
-                                        data-task-status-label="{{ $task->statusLabel() }}"
-                                        data-task-status-class="{{ $task->statusBadgeClass() }}"
-                                    >
-                                        <i class="bi bi-stopwatch me-1"></i> Log Time
-                                    </button>
-                                @endcan
-                                @can('update', $task)
-                                    <a class="btn btn-sm btn-outline-secondary" href="{{ route('tasks.edit', $task) }}">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                @endcan
-                                @can('delete', $task)
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-danger"
-                                        data-delete-confirm
-                                        data-delete-action="{{ route('tasks.destroy', $task) }}"
-                                        data-delete-title="Delete Task"
-                                        data-delete-message="Are you sure you want to delete {{ $task->title }}? This action cannot be undone."
-                                        data-delete-submit="Delete Task"
-                                    >
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                @endcan
+                            <td class="text-end task-table-actions-cell">
+                                <div class="task-actions">
+                                    @can('view', $task)
+                                        <a class="btn btn-outline-secondary task-action-icon-btn task-action-view" href="{{ route('tasks.show', $task) }}" aria-label="View {{ $task->title }}">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                    @endcan
+                                    @can('update', $task)
+                                        <button
+                                            type="button"
+                                            class="btn btn-outline-success task-action-btn"
+                                            data-task-log-time-trigger
+                                            data-task-id="{{ $task->id }}"
+                                            data-task-title="{{ $task->title }}"
+                                            data-task-client="{{ $task->client->name }}"
+                                            data-task-status="{{ $task->status }}"
+                                            data-task-status-label="{{ $task->statusLabel() }}"
+                                            data-task-status-class="{{ $task->statusBadgeClass() }}"
+                                            aria-label="Log time for {{ $task->title }}"
+                                        >
+                                            <i class="bi bi-stopwatch"></i>
+                                        </button>
+                                    @endcan
+                                    @can('update', $task)
+                                        <a class="btn btn-outline-secondary task-action-icon-btn task-action-edit" href="{{ route('tasks.edit', $task) }}" aria-label="Edit {{ $task->title }}">
+                                            <i class="bi bi-pencil"></i>
+                                        </a>
+                                    @endcan
+                                    @can('delete', $task)
+                                        <button
+                                            type="button"
+                                            class="btn btn-outline-danger task-action-icon-btn task-action-delete"
+                                            data-delete-confirm
+                                            data-delete-action="{{ route('tasks.destroy', $task) }}"
+                                            data-delete-title="Delete Task"
+                                            data-delete-message="Are you sure you want to delete {{ $task->title }}? This action cannot be undone."
+                                            data-delete-submit="Delete Task"
+                                            aria-label="Delete {{ $task->title }}"
+                                        >
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    @endcan
+                                </div>
                             </td>
                         </tr>
                     @empty

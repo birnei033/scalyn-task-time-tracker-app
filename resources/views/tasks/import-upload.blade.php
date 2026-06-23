@@ -1,22 +1,10 @@
 <x-app-layout>
     <x-slot name="header">Import Tasks</x-slot>
-
-    <section class="page-hero p-4 p-lg-5 mb-4">
-        <div class="row align-items-center g-4">
-            <div class="col-lg-8">
-                <div class="page-kicker mb-2">CSV import</div>
-                <h2 class="page-title h1 mb-3">Bring tasks in from a CSV file.</h2>
-                <p class="page-subtitle mb-0">
-                    Upload a CSV, map its columns to task fields, and import only the rows that pass validation.
-                </p>
-            </div>
-            <div class="col-lg-4 text-lg-end">
-                <a href="{{ route('tasks.index') }}" class="btn btn-outline-secondary btn-lg">
-                    Back to Tasks
-                </a>
-            </div>
-        </div>
-    </section>
+    <x-slot name="actions">
+        <a href="{{ route('tasks.index') }}" class="btn btn-outline-secondary btn-lg">
+            Back to Tasks
+        </a>
+    </x-slot>
 
     <div class="surface-card p-4 p-lg-5">
         <form method="POST" action="{{ route('tasks.import.store') }}" enctype="multipart/form-data">

@@ -1,32 +1,15 @@
 <x-app-layout>
     <x-slot name="header">{{ $client->name }}</x-slot>
-
-    <section class="page-hero p-4 p-lg-5 mb-4">
-        <div class="row align-items-center g-4">
-            <div class="col-lg-8">
-                <div class="page-kicker mb-2">Client profile</div>
-                <h2 class="page-title h1 mb-3">{{ $client->name }}</h2>
-                <p class="page-subtitle mb-0">
-                    Detailed view of client information, related tasks, and logged time.
-                </p>
-            </div>
-            <div class="col-lg-4 text-lg-end">
-                <div class="d-flex flex-wrap justify-content-lg-end gap-2">
-                    @can('update', $client)
-                        <a class="btn btn-primary" href="{{ route('clients.edit', $client) }}">
-                            <i class="bi bi-pencil me-1"></i> Edit Client
-                        </a>
-                    @endcan
-                    <a class="btn btn-outline-secondary" href="{{ $client->status === 'archived' ? route('clients.archives') : route('clients.index') }}">
-                        Back
-                    </a>
-                </div>
-                <div class="mt-3">
-                    <span class="badge {{ $client->status === 'active' ? 'badge-brand' : 'badge-soft' }} px-3 py-2">{{ ucfirst($client->status) }}</span>
-                </div>
-            </div>
-        </div>
-    </section>
+    <x-slot name="actions">
+        @can('update', $client)
+            <a class="btn btn-primary" href="{{ route('clients.edit', $client) }}">
+                <i class="bi bi-pencil me-1"></i> Edit Client
+            </a>
+        @endcan
+        <a class="btn btn-outline-secondary" href="{{ $client->status === 'archived' ? route('clients.archives') : route('clients.index') }}">
+            Back
+        </a>
+    </x-slot>
 
     <div class="row g-4">
         <div class="col-lg-4 d-grid gap-4">
@@ -94,7 +77,9 @@
                             @forelse ($client->tasks as $task)
                                 <tr>
                                     <td>{{ $task->title }}</td>
-                                    <td>{{ $task->assignedUser?->name ?: 'Unassigned' }}</td>
+                                    <td>
+                                        <x-user-identity :name="$task->assignedUser?->name" placeholder="Unassigned" :seed="$task->assigned_user_id ?? $task->id" />
+                                    </td>
                                     <td><span class="badge {{ $task->statusBadgeClass() }}">{{ $task->statusLabel() }}</span></td>
                                     <td class="text-end fw-semibold">{{ \App\Support\TimeDisplay::formatHours($task->timeEntries->sum('hours')) }}</td>
                                 </tr>

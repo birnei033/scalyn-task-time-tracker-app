@@ -90,7 +90,9 @@
                                         <div class="fw-semibold">{{ $entry->task->client->name }}</div>
                                         <div class="small text-muted">{{ $entry->task->title }}</div>
                                     </td>
-                                    <td>{{ $entry->user->name }}</td>
+                                    <td>
+                                        <x-user-identity :name="$entry->user->name" seed="{{ $entry->user_id }}" />
+                                    </td>
                                     <td class="text-end fw-semibold">{{ \App\Support\TimeDisplay::formatHours($entry->hours) }}</td>
                                 </tr>
                             @empty

@@ -1,24 +1,12 @@
 <x-app-layout>
     <x-slot name="header">Clients</x-slot>
-
-    <section class="page-hero p-4 p-lg-5 mb-4">
-        <div class="row align-items-center g-4">
-            <div class="col-lg-8">
-                <div class="page-kicker mb-2">Client records</div>
-                <h2 class="page-title h1 mb-3">Keep client data organized and accessible.</h2>
-                <p class="page-subtitle mb-0">
-                    Search, filter, and manage active clients with a cleaner table layout and branded controls.
-                </p>
-            </div>
-            <div class="col-lg-4 text-lg-end">
-                @can('create', App\Models\Client::class)
-                    <a href="{{ route('clients.create') }}" class="btn btn-primary btn-lg">
-                        <i class="bi bi-plus-lg me-1"></i> Add Client
-                    </a>
-                @endcan
-            </div>
-        </div>
-    </section>
+    <x-slot name="actions">
+        @can('create', App\Models\Client::class)
+            <a href="{{ route('clients.create') }}" class="btn btn-primary btn-lg">
+                <i class="bi bi-plus-lg me-1"></i> Add Client
+            </a>
+        @endcan
+    </x-slot>
 
     <div class="surface-card p-4 mb-4">
         <form class="row g-3 align-items-end" method="GET">
@@ -93,19 +81,20 @@
                             </td>
                             <td class="text-end">
                                 @can('update', $client)
-                                    <a class="btn btn-sm btn-outline-secondary" href="{{ route('clients.edit', $client) }}">
+                                    <a class="btn btn-outline-secondary table-action-icon-btn table-action-view" href="{{ route('clients.edit', $client) }}" aria-label="Edit {{ $client->name }}">
                                         <i class="bi bi-pencil"></i>
                                     </a>
                                 @endcan
                                 @can('delete', $client)
                                     <button
                                         type="button"
-                                        class="btn btn-sm btn-danger"
+                                        class="btn btn-outline-danger table-action-icon-btn table-action-delete"
                                         data-delete-confirm
                                         data-delete-action="{{ route('clients.destroy', $client) }}"
                                         data-delete-title="Archive Client"
                                         data-delete-message="Are you sure you want to archive {{ $client->name }}?"
                                         data-delete-submit="Archive Client"
+                                        aria-label="Archive {{ $client->name }}"
                                     >
                                         <i class="bi bi-archive"></i>
                                     </button>

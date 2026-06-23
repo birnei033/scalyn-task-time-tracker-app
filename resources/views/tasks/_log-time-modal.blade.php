@@ -21,7 +21,7 @@
                     {{ $selectedTask?->title ?: 'Choose a task from the table to log time.' }}
                 </div>
                 <div class="small text-muted" data-task-log-time-task-client>
-                    {{ $selectedTask?->client?->name ?: 'The modal will populate from the row you choose.' }}
+                    {{ $selectedTask?->client?->name ?: 'The popup will populate from the row you choose.' }}
                 </div>
                 <div class="mt-2">
                     <span

@@ -468,7 +468,7 @@ class WorkflowTest extends TestCase
                 'modal_form' => 'task-status-modal',
                 'task_id' => $task->id,
             ])
-            ->assertSee('data-auto-open="true"', false)
+            ->assertSee('data-swal-auto-open="true"', false)
             ->assertSee('Portal redesign discovery')
             ->assertSee('Northwind Logistics');
     }
@@ -530,7 +530,7 @@ class WorkflowTest extends TestCase
                 'task_id' => $task->id,
                 'return_to' => route('tasks.show', $task),
             ])
-            ->assertSee('data-auto-open="true"', false)
+            ->assertSee('data-swal-auto-open="true"', false)
             ->assertSee('Portal redesign discovery')
             ->assertSee('Northwind Logistics')
             ->assertSee('The priority field is required.', false);
@@ -837,7 +837,7 @@ class WorkflowTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('id="time-entry-edit-modal"', false)
-            ->assertSee('data-auto-open="true"', false)
+            ->assertSee('data-swal-auto-open="true"', false)
             ->assertSee('name="editing_entry" value="'.$entry->id.'"', false)
             ->assertSee('value="500"', false)
             ->assertSee('Time will be logged to this task', false);
@@ -951,7 +951,7 @@ class WorkflowTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('id="time-entry-edit-modal"', false)
-            ->assertSee('data-auto-open="true"', false)
+            ->assertSee('data-swal-auto-open="true"', false)
             ->assertSee('name="editing_entry" value="'.$entry->id.'"', false)
             ->assertSee('name="minutes" value="'.TimeDisplay::hoursToMinutes(1.5).'"', false)
             ->assertSee('name="return_to"', false)
@@ -1036,7 +1036,7 @@ class WorkflowTest extends TestCase
 
         $this->actingAs($member)->get(route('time-entries.index', $filters))
             ->assertOk()
-            ->assertSee('data-auto-open="true"', false)
+            ->assertSee('data-swal-auto-open="true"', false)
             ->assertSee('name="editing_entry" value="'.$entry->id.'"', false)
             ->assertSee('value="500"', false)
             ->assertSee('invalid-feedback', false);
@@ -1951,7 +1951,7 @@ class WorkflowTest extends TestCase
         $response
             ->assertOk()
             ->assertSee('id="time-entry-edit-modal"', false)
-            ->assertSee('data-auto-open="true"', false)
+            ->assertSee('data-swal-auto-open="true"', false)
             ->assertSee('name="editing_entry" value="'.$entry->id.'"', false)
             ->assertSee('name="minutes" value="'.TimeDisplay::hoursToMinutes(4).'"', false)
             ->assertSee('name="return_to"', false)
@@ -2030,7 +2030,7 @@ class WorkflowTest extends TestCase
 
         $this->actingAs($member)->get(route('timesheets.index', $filters))
             ->assertOk()
-            ->assertSee('data-auto-open="true"', false)
+            ->assertSee('data-swal-auto-open="true"', false)
             ->assertSee('name="editing_entry" value="'.$entry->id.'"', false)
             ->assertSee('value="500"', false)
             ->assertSee('invalid-feedback', false);

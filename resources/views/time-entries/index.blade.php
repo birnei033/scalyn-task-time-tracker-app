@@ -3,23 +3,11 @@
     @php
         $returnTo = route('time-entries.index', request()->except('editing_entry'));
     @endphp
-
-    <section class="page-hero p-4 p-lg-5 mb-4">
-        <div class="row align-items-center g-4">
-            <div class="col-lg-8">
-                <div class="page-kicker mb-2">Time tracking</div>
-                <h2 class="page-title h1 mb-3">Log work with less friction.</h2>
-                <p class="page-subtitle mb-0">
-                    Filter by date, create entries on a dedicated page, and review time using a table that stays readable on smaller screens.
-                </p>
-            </div>
-            <div class="col-lg-4 text-lg-end">
-                <a href="{{ route('time-entries.create') }}" class="btn btn-primary btn-lg">
-                    <i class="bi bi-plus-lg me-1"></i> Add Time
-                </a>
-            </div>
-        </div>
-    </section>
+    <x-slot name="actions">
+        <a href="{{ route('time-entries.create') }}" class="btn btn-primary btn-lg">
+            <i class="bi bi-plus-lg me-1"></i> Add Time
+        </a>
+    </x-slot>
 
     <div class="surface-card p-4 mb-4">
         <form class="row g-3 align-items-end" method="GET">
@@ -67,7 +55,9 @@
                     @forelse ($entries as $entry)
                         <tr>
                             <td>{{ $entry->date->format('M d, Y') }}</td>
-                            <td>{{ $entry->user->name }}</td>
+                            <td>
+                                <x-user-identity :name="$entry->user->name" seed="{{ $entry->user_id }}" />
+                            </td>
                             <td>
                                 <div class="fw-semibold">{{ $entry->task->client->name }}</div>
                                 <div class="small text-muted">{{ $entry->task->title }}</div>
@@ -78,7 +68,7 @@
                                 <div class="d-inline-flex gap-2">
                                     @can('update', $entry)
                                         <a
-                                            class="btn btn-sm btn-outline-secondary"
+                                            class="btn btn-outline-secondary table-action-icon-btn table-action-view"
                                             href="{{ route('time-entries.edit', $entry) }}"
                                             aria-label="Edit time entry for {{ $entry->task->title }}"
                                             data-time-entry-edit-trigger
@@ -96,7 +86,7 @@
                                     @can('delete', $entry)
                                         <button
                                             type="button"
-                                            class="btn btn-sm btn-outline-danger"
+                                            class="btn btn-outline-danger table-action-icon-btn table-action-delete"
                                             data-delete-confirm
                                             data-delete-action="{{ route('time-entries.destroy', $entry) }}"
                                             data-delete-title="Delete Logged Time"

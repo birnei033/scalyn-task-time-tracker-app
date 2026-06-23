@@ -19,7 +19,7 @@
                 <div class="text-muted small">Complete the form and save your changes.</div>
             </div>
 
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{{ $cancelLabel }}"></button>
+            <button type="button" class="btn-close" data-swal-close aria-label="{{ $cancelLabel }}"></button>
         </div>
 
         <div class="modal-body">
@@ -38,7 +38,7 @@
                         <i class="bi bi-save"></i> {{ $submitLabel }}
                     </button>
 
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+                    <button type="button" class="btn btn-outline-secondary" data-swal-close>
                         {{ $cancelLabel }}
                     </button>
                 </div>

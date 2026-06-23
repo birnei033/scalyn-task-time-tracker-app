@@ -19,7 +19,7 @@
                     {{ $selectedTask?->title ?: 'Choose a task status from the table.' }}
                 </div>
                 <div class="small text-muted" data-task-status-task-client>
-                    {{ $selectedTask?->client?->name ?: 'The modal will populate from the row you choose.' }}
+                    {{ $selectedTask?->client?->name ?: 'The popup will populate from the row you choose.' }}
                 </div>
                 <div class="mt-2">
                     <span

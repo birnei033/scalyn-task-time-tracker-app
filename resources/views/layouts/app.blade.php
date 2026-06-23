@@ -20,37 +20,35 @@
         <div class="content-area">
             <header class="app-topbar">
                 <div class="page-shell py-3 py-lg-3">
-                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-                        <div class="d-flex align-items-center gap-3">
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 app-topbar-row">
+                        <div class="d-flex align-items-center gap-3 min-w-0">
                             <button type="button" class="btn btn-outline-secondary btn-sm sidebar-toggle d-lg-none" data-sidebar-toggle>
                                 <i class="bi bi-list"></i>
                             </button>
 
-                            <div class="d-flex align-items-center gap-3">
-                                <span class="sidebar-brand-mark d-none d-sm-inline-flex" style="width: 44px; height: 44px;">
+                            <div class="d-flex align-items-center gap-3 min-w-0">
+                                <span class="app-topbar-brand-mark d-none d-sm-inline-flex">
                                     <x-application-logo class="brand-mark" />
                                 </span>
-                                <div class="d-flex flex-column gap-2">
-                                    <div class="page-kicker mb-1">Scalyn Task Time Tracker</div>
-                                    <div class="d-flex flex-wrap align-items-center gap-2">
-                                        <h1 class="page-title h4 mb-0">{{ $header ?? 'Dashboard' }}</h1>
-
-                                        @isset($actions)
-                                            <div class="d-flex flex-wrap align-items-center gap-2">
-                                                {{ $actions }}
-                                            </div>
-                                        @endisset
-                                    </div>
+                                <div class="d-flex flex-column min-w-0">
+                                    <div class="page-kicker app-topbar-kicker mb-1">Scalyn Task Time Tracker</div>
+                                    <h1 class="page-title app-topbar-title h4 mb-0">{{ $header ?? 'Dashboard' }}</h1>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="d-flex flex-wrap align-items-center justify-content-end gap-2">
-                            <span class="badge badge-soft text-capitalize">{{ auth()->user()->role }}</span>
-                            <span class="badge text-bg-light border d-none d-md-inline-flex">{{ auth()->user()->name }}</span>
+                        <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 app-topbar-controls">
+                            @isset($actions)
+                                <div class="d-flex flex-wrap align-items-center gap-2 app-topbar-actions">
+                                    {{ $actions }}
+                                </div>
+                            @endisset
+
+                            <span class="badge badge-soft text-capitalize app-pill">{{ auth()->user()->role }}</span>
+                            <span class="badge text-bg-light border app-pill d-none d-md-inline-flex">{{ auth()->user()->name }}</span>
                             <form method="POST" action="{{ route('logout') }}">
                                 @csrf
-                                <button class="btn btn-outline-secondary btn-sm" type="submit" data-loading-text="Signing out...">
+                                <button class="btn btn-outline-secondary btn-sm app-pill" type="submit" data-loading-text="Signing out...">
                                     <i class="bi bi-box-arrow-right me-1"></i>
                                     Logout
                                 </button>
