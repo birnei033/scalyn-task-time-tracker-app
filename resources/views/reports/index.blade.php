@@ -65,7 +65,7 @@
     </div>
 
     <div class="row g-4">
-        @foreach ([['key' => 'clientHours', 'title' => 'Time per Client', 'rows' => $clientHours, 'name' => 'name', 'exportLabel' => 'Export client time CSV'], ['key' => 'taskHours', 'title' => 'Time per Task', 'rows' => $taskHours, 'name' => 'title', 'exportLabel' => 'Export task time CSV'], ['key' => 'userHours', 'title' => 'Time per Employee', 'rows' => $userHours, 'name' => 'name', 'exportLabel' => 'Export employee time CSV']] as $report)
+        @foreach ([['key' => 'clientHours', 'title' => 'Time per Client', 'rows' => $clientHours, 'name' => 'name', 'exportLabel' => 'Export client time as PDF or CSV'], ['key' => 'taskHours', 'title' => 'Time per Task', 'rows' => $taskHours, 'name' => 'title', 'exportLabel' => 'Export task time as PDF or CSV'], ['key' => 'userHours', 'title' => 'Time per Employee', 'rows' => $userHours, 'name' => 'name', 'exportLabel' => 'Export employee time as PDF or CSV']] as $report)
             <div class="col-lg-4">
                 <div class="table-panel h-100">
                     <div class="table-panel-header">
@@ -73,10 +73,18 @@
                             <div class="table-panel-eyebrow mb-1">Breakdown</div>
                             <h3 class="table-panel-title mb-0">{{ $report['title'] }}</h3>
                         </div>
-                        <a class="stat-icon stat-icon-labeled" href="{{ route('reports.export', array_merge(request()->query(), ['report' => $report['key']])) }}" aria-label="{{ $report['exportLabel'] }}" title="{{ $report['exportLabel'] }}">
+                        <button
+                            type="button"
+                            class="stat-icon stat-icon-labeled stat-icon-button"
+                            data-report-export-trigger
+                            data-report-export-report="{{ $report['key'] }}"
+                            data-report-export-title="{{ $report['title'] }}"
+                            aria-label="{{ $report['exportLabel'] }}"
+                            title="{{ $report['exportLabel'] }}"
+                        >
                             <span>Export</span>
                             <i class="bi bi-download"></i>
-                        </a>
+                        </button>
                     </div>
                     <div class="table-responsive">
                         <table class="table table-hover align-middle mb-0">
@@ -106,4 +114,6 @@
             </div>
         @endforeach
     </div>
+
+    @include('reports._export-modal')
 </x-app-layout>

@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\Client;
 use App\Models\TimeEntry;
 use App\Models\User;
 use App\Support\TimeDisplay;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -22,9 +24,17 @@ class ReportController extends Controller
     {
         abort_unless($request->user()->canManageTeam(), 403);
 
-        $report = $this->reportExportDefinition($request->query('report'));
+        $report = $this->reportDefinition($request->query('report'));
         $data = $this->reportData($request);
-        $filename = $report['filename'];
+
+        return match (strtolower((string) $request->query('format', 'csv'))) {
+            'pdf' => $this->exportPdf($report, $data),
+            default => $this->exportCsv($report, $data),
+        };
+    }
+
+    private function exportCsv(array $report, array $data)
+    {
         $handle = fopen('php://temp', 'r+');
 
         fputcsv($handle, $report['columns']);
@@ -47,8 +57,25 @@ class ReportController extends Controller
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Content-Disposition' => 'attachment; filename="'.$report['csvFilename'].'"',
         ]);
+    }
+
+    private function exportPdf(array $report, array $data)
+    {
+        $pdf = Pdf::loadView('reports.export', [
+            'report' => $report,
+            'data' => $data,
+            'generatedAt' => now()->format('M j, Y g:i A'),
+            'filters' => [
+                ['label' => 'View', 'value' => ucfirst($data['view'])],
+                ['label' => 'Date range', 'value' => Carbon::parse($data['from'])->format('M j, Y').' to '.Carbon::parse($data['to'])->format('M j, Y')],
+                ['label' => 'Client', 'value' => $data['selectedClientName'] ?? 'All clients'],
+                ['label' => 'User', 'value' => $data['selectedUserName'] ?? 'All users'],
+            ],
+        ])->setPaper('a4', 'portrait');
+
+        return $pdf->download($report['pdfFilename']);
     }
 
     private function reportData(Request $request): array
@@ -56,21 +83,28 @@ class ReportController extends Controller
         $view = $request->query('view', 'monthly');
         $from = $request->query('from', now()->startOfMonth()->toDateString());
         $to = $request->query('to', now()->endOfMonth()->toDateString());
+        $clientId = $request->filled('client_id') ? (int) $request->input('client_id') : null;
+        $userId = $request->filled('user_id') ? (int) $request->input('user_id') : null;
 
         $base = TimeEntry::query()
             ->whereDate('date', '>=', $from)
             ->whereDate('date', '<=', $to)
-            ->when($request->integer('client_id'), function ($query, $clientId) {
+            ->when($clientId, function ($query, $clientId) {
                 $query->whereHas('task', fn ($query) => $query->where('client_id', $clientId));
             })
-            ->when($request->integer('user_id'), fn ($query, $userId) => $query->where('user_id', $userId));
+            ->when($userId, fn ($query, $userId) => $query->where('user_id', $userId));
+
+        $clients = Client::orderBy('name')->get();
+        $users = User::orderBy('name')->get();
 
         return [
             'view' => $view,
             'from' => $from,
             'to' => $to,
-            'clients' => Client::orderBy('name')->get(),
-            'users' => User::orderBy('name')->get(),
+            'clients' => $clients,
+            'users' => $users,
+            'selectedClientName' => $clientId ? $clients->firstWhere('id', $clientId)?->name : null,
+            'selectedUserName' => $userId ? $users->firstWhere('id', $userId)?->name : null,
             'totalHours' => (clone $base)->sum('hours'),
             'clientHours' => (clone $base)
                 ->join('tasks', 'time_entries.task_id', '=', 'tasks.id')
@@ -94,26 +128,32 @@ class ReportController extends Controller
         ];
     }
 
-    private function reportExportDefinition(?string $report): array
+    private function reportDefinition(?string $report): array
     {
         return match ($report) {
             'clientHours' => [
                 'section' => 'clientHours',
                 'field' => 'name',
+                'title' => 'Time per Client',
                 'columns' => ['Name', 'Time', 'Excess Time'],
-                'filename' => 'scalyn-hours-per-client.csv',
+                'csvFilename' => 'scalyn-hours-per-client.csv',
+                'pdfFilename' => 'scalyn-hours-per-client.pdf',
             ],
             'taskHours' => [
                 'section' => 'taskHours',
                 'field' => 'title',
+                'title' => 'Time per Task',
                 'columns' => ['Task', 'Time'],
-                'filename' => 'scalyn-hours-per-task.csv',
+                'csvFilename' => 'scalyn-hours-per-task.csv',
+                'pdfFilename' => 'scalyn-hours-per-task.pdf',
             ],
             'userHours' => [
                 'section' => 'userHours',
                 'field' => 'name',
+                'title' => 'Time per Employee',
                 'columns' => ['Name', 'Time'],
-                'filename' => 'scalyn-hours-per-employee.csv',
+                'csvFilename' => 'scalyn-hours-per-employee.csv',
+                'pdfFilename' => 'scalyn-hours-per-employee.pdf',
             ],
             default => abort(404),
         };

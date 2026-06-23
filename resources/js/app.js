@@ -824,5 +824,38 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    const reportExportSource = document.getElementById('report-export-modal');
+
+    document.querySelectorAll('[data-report-export-trigger]').forEach((trigger) => {
+        trigger.addEventListener('click', () => {
+            if (!reportExportSource) {
+                return;
+            }
+
+            openSwalFromSource(reportExportSource, {
+                beforeOpen: (content) => {
+                    clearValidationState(content);
+
+                    const reportInput = content.querySelector('#report-export-report');
+                    const title = content.querySelector('#report-export-title');
+                    const copy = content.querySelector('#report-export-copy');
+                    const reportTitle = trigger.getAttribute('data-report-export-title') || 'Report';
+
+                    if (reportInput) {
+                        reportInput.value = trigger.getAttribute('data-report-export-report') || '';
+                    }
+
+                    if (title) {
+                        title.textContent = `${reportTitle} export`;
+                    }
+
+                    if (copy) {
+                        copy.textContent = `Choose how you want to export the ${reportTitle.toLowerCase()} breakdown without losing the current filters.`;
+                    }
+                },
+            });
+        });
+    });
+
     bindLoadingStateForRoot(document);
 });

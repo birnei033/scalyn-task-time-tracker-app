@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\Client;
 use App\Models\Task;
 use App\Models\TimeEntry;
 use App\Models\User;
 use App\Support\TimeDisplay;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 
 class TimesheetController extends Controller
@@ -37,7 +39,16 @@ class TimesheetController extends Controller
 
     public function export(Request $request)
     {
-        [$entries] = $this->timesheetPayload($request);
+        [$entries, $view, $from, $to, $sort, $direction] = $this->timesheetPayload($request);
+
+        return match (strtolower((string) $request->query('format', 'csv'))) {
+            'pdf' => $this->exportPdf($entries, $view, $from, $to, $sort, $direction),
+            default => $this->exportCsv($entries),
+        };
+    }
+
+    private function exportCsv($entries)
+    {
         $handle = fopen('php://temp', 'r+');
 
         fputcsv($handle, ['Date', 'User', 'Client', 'Task', 'Notes', 'Time']);
@@ -63,6 +74,22 @@ class TimesheetController extends Controller
         ]);
     }
 
+    private function exportPdf($entries, string $view, Carbon $from, Carbon $to, string $sort, string $direction)
+    {
+        $pdf = Pdf::loadView('timesheets.export', [
+            'entries' => $entries,
+            'view' => $view,
+            'from' => $from,
+            'to' => $to,
+            'sort' => $sort,
+            'direction' => $direction,
+            'totalHours' => $entries->sum('hours'),
+            'generatedAt' => now()->format('M j, Y g:i A'),
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->download('scalyn-timesheets.pdf');
+    }
+
     /**
      * @return array{0:\Illuminate\Support\Collection<int, \App\Models\TimeEntry>, 1:string, 2:\Illuminate\Support\Carbon, 3:\Illuminate\Support\Carbon, 4:string, 5:string}
      */
@@ -72,9 +99,10 @@ class TimesheetController extends Controller
         $from = $this->resolveFromDate($request, $view);
         $to = $this->resolveToDate($request, $view, $from);
         [$sort, $direction] = $this->sortState($request->query('sort', 'date'), $request->query('direction', 'asc'));
+        $sortColumn = $this->sortColumn($sort);
 
         return [
-            $this->timesheetQuery($request, $from, $to, $sort, $direction)->get(),
+            $this->timesheetQuery($request, $from, $to, $sortColumn, $direction)->get(),
             $view,
             $from,
             $to,
@@ -83,7 +111,7 @@ class TimesheetController extends Controller
         ];
     }
 
-    private function timesheetQuery(Request $request, $from, $to, string $sort, string $direction): Builder
+    private function timesheetQuery(Request $request, $from, $to, string $sortColumn, string $direction): Builder
     {
         $user = $request->user();
         $clientId = $request->integer('client_id');
@@ -99,7 +127,7 @@ class TimesheetController extends Controller
             ->when(! $user->canManageTeam(), fn ($query) => $query->where('time_entries.user_id', $user->id))
             ->when($user->canManageTeam() && $request->integer('user_id'), fn ($query) => $query->where('time_entries.user_id', $request->integer('user_id')))
             ->when($clientId, fn ($query) => $query->whereHas('task', fn ($query) => $query->where('client_id', $clientId)))
-            ->orderBy($sort, $direction)
+            ->orderBy($sortColumn, $direction)
             ->orderBy('time_entries.id', $direction);
     }
 
@@ -123,7 +151,21 @@ class TimesheetController extends Controller
 
     private function sortState(string $sort, string $direction): array
     {
-        $columns = [
+        if (! array_key_exists($sort, $this->sortColumns())) {
+            return ['date', 'asc'];
+        }
+
+        return [$sort, in_array(strtolower($direction), ['asc', 'desc'], true) ? strtolower($direction) : 'asc'];
+    }
+
+    private function sortColumn(string $sort): string
+    {
+        return $this->sortColumns()[$sort] ?? 'time_entries.date';
+    }
+
+    private function sortColumns(): array
+    {
+        return [
             'date' => 'time_entries.date',
             'user' => 'users.name',
             'client' => 'clients.name',
@@ -131,11 +173,5 @@ class TimesheetController extends Controller
             'notes' => 'time_entries.notes',
             'hours' => 'time_entries.hours',
         ];
-
-        if (! array_key_exists($sort, $columns)) {
-            return [$columns['date'], 'asc'];
-        }
-
-        return [$columns[$sort], in_array(strtolower($direction), ['asc', 'desc'], true) ? strtolower($direction) : 'asc'];
     }
 }

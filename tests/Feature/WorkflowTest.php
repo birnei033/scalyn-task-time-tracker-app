@@ -1945,12 +1945,30 @@ class WorkflowTest extends TestCase
             'user_id' => '',
         ]))
             ->assertOk()
-            ->assertSee('report=clientHours', false)
-            ->assertSee('report=taskHours', false)
-            ->assertSee('report=userHours', false)
-            ->assertSeeInOrder(['Export', 'bi bi-download'])
-            ->assertSee('from=2026-06-01', false)
-            ->assertSee('to=2026-06-30', false);
+            ->assertSee('report-export-modal', false)
+            ->assertSee('data-report-export-trigger', false)
+            ->assertSee('data-report-export-report="clientHours"', false)
+            ->assertSee('data-report-export-report="taskHours"', false)
+            ->assertSee('data-report-export-report="userHours"', false)
+            ->assertSee('Export client time as PDF or CSV')
+            ->assertSee('name="from" value="2026-06-01"', false)
+            ->assertSee('name="to" value="2026-06-30"', false);
+    }
+
+    public function test_reports_index_renders_export_modal_choices(): void
+    {
+        $manager = User::factory()->create(['role' => 'manager']);
+
+        $this->actingAs($manager)->get(route('reports.index', [
+            'from' => '2026-06-01',
+            'to' => '2026-06-30',
+        ]))
+            ->assertOk()
+            ->assertSee('Choose a format', false)
+            ->assertSee('CSV', false)
+            ->assertSee('PDF', false)
+            ->assertSee('Best for spreadsheets, data cleanup, and quick sharing.', false)
+            ->assertSee('Best for polished reviews, printing, and stakeholder updates.', false);
     }
 
     public function test_reports_defaults_to_monthly_view_with_current_month_dates(): void
@@ -1993,6 +2011,23 @@ class WorkflowTest extends TestCase
             ->assertDontSee('Scalyn Member');
     }
 
+    public function test_reports_client_hours_pdf_export_is_filtered_to_that_card(): void
+    {
+        $fixtures = $this->createReportExportFixtures();
+
+        $this->actingAs($fixtures['manager'])->get(route('reports.export', [
+            'report' => 'clientHours',
+            'format' => 'pdf',
+            'from' => '2026-06-01',
+            'to' => '2026-06-30',
+            'client_id' => $fixtures['northwindClient']->id,
+            'user_id' => $fixtures['manager']->id,
+            ]))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('content-disposition', 'attachment; filename=scalyn-hours-per-client.pdf');
+    }
+
     public function test_reports_client_hours_csv_export_shows_zero_excess_for_under_budget_clients(): void
     {
         $fixtures = $this->createReportExportFixtures();
@@ -2033,6 +2068,22 @@ class WorkflowTest extends TestCase
             ->assertDontSee('Scalyn Manager');
     }
 
+    public function test_reports_task_hours_pdf_export_returns_a_pdf_download(): void
+    {
+        $fixtures = $this->createReportExportFixtures();
+
+        $this->actingAs($fixtures['manager'])->get(route('reports.export', [
+            'report' => 'taskHours',
+            'format' => 'pdf',
+            'from' => '2026-06-01',
+            'to' => '2026-06-30',
+            'user_id' => $fixtures['member']->id,
+            ]))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('content-disposition', 'attachment; filename=scalyn-hours-per-task.pdf');
+    }
+
     public function test_reports_employee_hours_csv_export_is_filtered_to_that_card(): void
     {
         $fixtures = $this->createReportExportFixtures();
@@ -2054,6 +2105,22 @@ class WorkflowTest extends TestCase
             ->assertDontSee(TimeDisplay::formatHours(5));
     }
 
+    public function test_reports_employee_hours_pdf_export_returns_a_pdf_download(): void
+    {
+        $fixtures = $this->createReportExportFixtures();
+
+        $this->actingAs($fixtures['manager'])->get(route('reports.export', [
+            'report' => 'userHours',
+            'format' => 'pdf',
+            'from' => '2026-06-01',
+            'to' => '2026-06-30',
+            'client_id' => $fixtures['northwindClient']->id,
+            ]))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('content-disposition', 'attachment; filename=scalyn-hours-per-employee.pdf');
+    }
+
     public function test_reports_csv_export_returns_only_headers_when_no_rows_match(): void
     {
         $manager = User::factory()->create(['role' => 'manager']);
@@ -2062,12 +2129,27 @@ class WorkflowTest extends TestCase
             'report' => 'clientHours',
             'from' => '2025-01-01',
             'to' => '2025-01-31',
-        ]))
+            ]))
             ->assertOk()
             ->assertHeader('content-type', 'text/csv; charset=UTF-8')
             ->assertSee('Name,Time')
             ->assertDontSee('Northwind Logistics')
             ->assertDontSee('Website Build');
+    }
+
+    public function test_reports_pdf_export_returns_a_download_even_when_no_rows_match(): void
+    {
+        $manager = User::factory()->create(['role' => 'manager']);
+
+        $this->actingAs($manager)->get(route('reports.export', [
+            'report' => 'clientHours',
+            'format' => 'pdf',
+            'from' => '2025-01-01',
+            'to' => '2025-01-31',
+            ]))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('content-disposition', 'attachment; filename=scalyn-hours-per-client.pdf');
     }
 
     public function test_timesheet_renders_export_link_with_current_filters(): void
@@ -2087,26 +2169,20 @@ class WorkflowTest extends TestCase
             'direction' => 'desc',
         ]))
             ->assertOk()
-            ->assertDontSee('class="stat-icon" href="'.route('timesheets.export', [
-                'view' => 'weekly',
-                'from' => '2026-06-08',
-                'to' => '2026-06-14',
-                'client_id' => $client->id,
-                'user_id' => $manager->id,
-                'sort' => 'hours',
-                'direction' => 'desc',
-            ]).'"', false)
+            ->assertSee('id="timesheet-export-modal"', false)
+            ->assertSee('data-swal-open="timesheet-export-modal"', false)
+            ->assertSee('name="view" value="weekly"', false)
+            ->assertSee('name="from" value="2026-06-08"', false)
+            ->assertSee('name="to" value="2026-06-14"', false)
+            ->assertSee('name="client_id" value="'.$client->id.'"', false)
+            ->assertSee('name="user_id" value="'.$manager->id.'"', false)
+            ->assertSee('name="sort" value="hours"', false)
+            ->assertSee('name="direction" value="desc"', false)
             ->assertSee('table-panel-footer-action', false)
             ->assertSee('Export', false)
-            ->assertSee(route('timesheets.export', [
-                'view' => 'weekly',
-                'from' => '2026-06-08',
-                'to' => '2026-06-14',
-                'client_id' => $client->id,
-                'user_id' => $manager->id,
-                'sort' => 'hours',
-                'direction' => 'desc',
-            ]));
+            ->assertSee('Choose a format', false)
+            ->assertSee('CSV', false)
+            ->assertSee('PDF', false);
     }
 
     public function test_timesheet_csv_export_respects_filters_and_headers(): void
@@ -2148,6 +2224,42 @@ class WorkflowTest extends TestCase
             ->assertSee(TimeDisplay::formatHours(1.75))
             ->assertDontSee('Scalyn Manager')
             ->assertDontSee('Manager note');
+    }
+
+    public function test_timesheet_pdf_export_respects_filters_and_headers(): void
+    {
+        $fixtures = $this->createTimesheetExportFixtures();
+
+        $this->actingAs($fixtures['manager'])->get(route('timesheets.export', [
+            'view' => 'weekly',
+            'from' => '2026-06-08',
+            'to' => '2026-06-14',
+            'client_id' => $fixtures['northwindClient']->id,
+            'user_id' => $fixtures['member']->id,
+            'sort' => 'date',
+            'direction' => 'asc',
+            'format' => 'pdf',
+        ]))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('content-disposition', 'attachment; filename=scalyn-timesheets.pdf');
+    }
+
+    public function test_timesheet_pdf_export_keeps_member_scope_even_with_other_user_filter(): void
+    {
+        $fixtures = $this->createTimesheetExportFixtures();
+
+        $this->actingAs($fixtures['member'])->get(route('timesheets.export', [
+            'view' => 'weekly',
+            'from' => '2026-06-08',
+            'to' => '2026-06-14',
+            'client_id' => $fixtures['northwindClient']->id,
+            'user_id' => $fixtures['manager']->id,
+            'format' => 'pdf',
+        ]))
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf')
+            ->assertHeader('content-disposition', 'attachment; filename=scalyn-timesheets.pdf');
     }
 
     public function test_timesheet_shows_total_hours(): void

@@ -199,13 +199,14 @@
             </table>
         </div>
         <div class="table-panel-footer">
-            <a class="table-panel-footer-action" href="{{ route('timesheets.export', request()->query()) }}" aria-label="Export filtered timesheets CSV" title="Export filtered timesheets CSV">
+            <button type="button" class="table-panel-footer-action" data-swal-open="timesheet-export-modal" aria-label="Export filtered timesheets as CSV or PDF" title="Export filtered timesheets as CSV or PDF">
                 <span>Export</span>
                 <i class="bi bi-download"></i>
-            </a>
+            </button>
         </div>
     </div>
 
+    @include('timesheets._export-modal')
     @include('time-entries._edit-modal', [
         'selectedEntry' => $selectedEntry,
         'showModal' => $showEditModal,
